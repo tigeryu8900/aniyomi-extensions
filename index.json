@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Tachiyomi: RitharScans",
+    "pkg": "eu.kanade.tachiyomi.extension.en.ritharscans",
+    "apk": "tachiyomi-en.ritharscans-v1.4.19.apk",
+    "lang": "en",
+    "code": 19,
+    "version": "1.4.19",
+    "nsfw": 0,
+    "sources": [
+      {
+        "name": "RitharScans",
+        "lang": "en",
+        "id": "8220771912098311271",
+        "baseUrl": "https://ritharscans.com",
+        "versionId": 1
+      }
+    ]
+  }
+]
