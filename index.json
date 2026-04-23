@@ -1,11 +1,11 @@
 [
   {
-    "name": "Tachiyomi: RitharScans",
+    "name": "Aniyomi: RitharScans",
     "pkg": "eu.kanade.tachiyomi.extension.en.ritharscans",
-    "apk": "tachiyomi-en.ritharscans-v1.4.19.apk",
+    "apk": "aniyomi-en.ritharscans-v1.4.20.apk",
     "lang": "en",
-    "code": 19,
-    "version": "1.4.19",
+    "code": 20,
+    "version": "1.4.20",
     "nsfw": 0,
     "sources": [
       {
