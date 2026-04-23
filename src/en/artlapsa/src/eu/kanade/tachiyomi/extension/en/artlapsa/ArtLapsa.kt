@@ -6,7 +6,6 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.util.asJsoup
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -16,7 +15,6 @@ import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.nodes.Document
 import uy.kohesive.injekt.injectLazy
-import kotlin.getValue
 
 class ArtLapsa : Keyoapp("Art Lapsa", "https://artlapsa.com", "en") {
 
@@ -29,7 +27,8 @@ class ArtLapsa : Keyoapp("Art Lapsa", "https://artlapsa.com", "en") {
 
     override fun genresRequest() = GET("$baseUrl/search", headers)
 
-    override fun parseGenres(document: Document): List<Genre> = document.select("[wire:model.live=genre] option:not(:contains(All))").map { Genre(it.text(), it.attr("value")) }
+    override fun parseGenres(document: Document): List<Genre> =
+        document.select("[wire:model.live=genre] option:not(:contains(All))").map { Genre(it.text(), it.attr("value")) }
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
         val url = "$baseUrl/search".toHttpUrl().newBuilder().apply {
@@ -65,23 +64,17 @@ class ArtLapsa : Keyoapp("Art Lapsa", "https://artlapsa.com", "en") {
     override fun pageListParse(document: Document): List<Page> {
         val data = json.parseToJsonElement(document.selectFirst("script[type=\"application/ld+json\"]")!!.data()).jsonObject
         val seriesURL = data["isPartOf"]!!.jsonObject["url"]!!.jsonPrimitive.content
-        val series = seriesURL.substring(seriesURL.lastIndexOf('/') + 1)
+        val seriesID = seriesURL.substring(seriesURL.lastIndexOf('/') + 1)
         val chapterURL = data["url"]!!.jsonPrimitive.content
-        val chapter = chapterURL.substring(chapterURL.lastIndexOf('/') + 1)
+        val chapterID = chapterURL.substring(chapterURL.lastIndexOf('/') + 1)
         val numberOfPages = data["numberOfPages"]!!.jsonPrimitive.int
+
         return (1..numberOfPages).mapIndexed { i, page ->
             Page(
                 i,
                 document.location(),
-                "$baseUrl/storage/series/webtoon/$series/chapters/$chapter/${page.toString().padStart(3, '0')}.jpg",
+                "$baseUrl/storage/series/webtoon/$seriesID/chapters/$chapterID/${page.toString().padStart(3, '0')}.jpg",
             )
         }
     }
 }
-
-private val spaces = Regex("\\s")
-private val pagesRegex = Regex("pages:(\\[[^]]+])")
-private val linkRegex = """baseLink:(["'])(.+?)\1""".toRegex()
-
-@Serializable
-class Path(val path: String)
