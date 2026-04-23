@@ -73,13 +73,13 @@ class RitharScans : Keyoapp("RitharScans", "https://ritharscans.com", "en") {
     override val typeSelector = "[alt=Type]"
 
     override fun pageListParse(document: Document): List<Page> {
-        val data = json.parseToJsonElement(document.selectFirst("script[type=\"application/ld+json\"]")!!.text()).jsonObject
+        val data = json.parseToJsonElement(document.selectFirst("script[type=\"application/ld+json\"]")!!.data()).jsonObject
         val seriesURL = data["isPartOf"]!!.jsonObject["url"]!!.jsonPrimitive.content
-        val series = seriesURL.substring(seriesURL.lastIndexOf('/'))
+        val series = seriesURL.substring(seriesURL.lastIndexOf('/') + 1)
         val chapterURL = data["url"]!!.jsonPrimitive.content
-        val chapter = chapterURL.substring(chapterURL.lastIndexOf('/'))
-        val numOfPages = data["numOfPages"]!!.jsonPrimitive.int
-        return (1..numOfPages).mapIndexed { i, page ->
+        val chapter = chapterURL.substring(chapterURL.lastIndexOf('/') + 1)
+        val numberOfPages = data["numberOfPages"]!!.jsonPrimitive.int
+        return (1..numberOfPages).mapIndexed { i, page ->
             Page(
                 i,
                 document.location(),
