@@ -82,13 +82,13 @@ class RitharScans : Keyoapp("RitharScans", "https://ritharscans.com", "en") {
 }
 
 @Serializable
-internal class ChapterLD (
+internal class ChapterLD(
     val isPartOf: SeriesLD,
     val numberOfPages: Int,
     val url: String,
 )
 
 @Serializable
-internal class SeriesLD (
+internal class SeriesLD(
     val url: String,
 )

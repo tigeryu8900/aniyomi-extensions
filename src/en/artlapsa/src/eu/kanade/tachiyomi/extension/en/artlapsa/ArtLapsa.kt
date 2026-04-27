@@ -71,13 +71,13 @@ class ArtLapsa : Keyoapp("Art Lapsa", "https://artlapsa.com", "en") {
 }
 
 @Serializable
-internal class ChapterLD (
+internal class ChapterLD(
     val isPartOf: SeriesLD,
     val numberOfPages: Int,
     val url: String,
 )
 
 @Serializable
-internal class SeriesLD (
+internal class SeriesLD(
     val url: String,
 )
