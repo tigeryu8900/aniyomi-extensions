@@ -429,56 +429,84 @@ abstract class MangaBox(
         // Add all parsed cdns to set
         cdnSet.addAll(cdns)
 
-        val images = chapterImages.map { imagePath ->
-            getByteArray(
-                cdns[0].toHttpUrl().run {
-                    newBuilder()
-                        .encodedPath(
-                            "/$imagePath".replace(
-                                "//",
-                                "/",
-                            ),
-                        ) // replace ensures that there's at least one trailing slash prefix
-                        .build()
-                        .toString()
-                },
-            )
-        }.ifEmpty {
-            document.select("div.container-chapter-reader > img").map { img ->
-                getByteArray(img.absUrl("src"))
+        return if (mergeImages == true) {
+            val images = chapterImages.map { imagePath ->
+                getByteArray(
+                    cdns[0].toHttpUrl().run {
+                        newBuilder()
+                            .encodedPath(
+                                "/$imagePath".replace(
+                                    "//",
+                                    "/",
+                                ),
+                            ) // replace ensures that there's at least one trailing slash prefix
+                            .build()
+                            .toString()
+                    },
+                )
+            }.ifEmpty {
+                document.select("div.container-chapter-reader > img").map { img ->
+                    getByteArray(img.absUrl("src"))
+                }
             }
-        }
 
-        val pageList = mutableListOf<Page>()
+            val pageList = mutableListOf<Page>()
 
-        var prev: Bitmap? = null
+            var prev: Bitmap? = null
 
-        for (image in images) {
-            val curr = BitmapFactory.decodeByteArray(image, 0, image.size)
-            if (prev != null) {
-                if (curr.width == prev.width && curr.width > 4 * curr.height) {
-                    val cs = Bitmap.createBitmap(prev.width, prev.height + curr.height, prev.config)
+            for (image in images) {
+                val curr = BitmapFactory.decodeByteArray(image, 0, image.size)
+                if (prev != null) {
+                    if (curr.width == prev.width && curr.width > 4 * curr.height) {
+                        val cs = Bitmap.createBitmap(prev.width, prev.height + curr.height, prev.config)
 
-                    val canvas = Canvas(cs)
-                    canvas.drawBitmap(prev, 0f, 0f, null)
-                    canvas.drawBitmap(curr, 0f, prev.height.toFloat(), null)
+                        val canvas = Canvas(cs)
+                        canvas.drawBitmap(prev, 0f, 0f, null)
+                        canvas.drawBitmap(curr, 0f, prev.height.toFloat(), null)
 
-                    pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(cs)))
-                    prev = null
+                        pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(cs)))
+                        prev = null
+                    } else {
+                        pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
+                        prev = curr
+                    }
                 } else {
-                    pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
                     prev = curr
                 }
-            } else {
-                prev = curr
+            }
+
+            if (prev != null) {
+                pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
+            }
+
+            pageList
+        } else {
+            chapterImages.mapIndexed { i, imagePath ->
+                Page(
+                    i,
+                    document.location(),
+                    cdns[0].toHttpUrl().run {
+                        newBuilder()
+                            .encodedPath(
+                                "/$imagePath".replace(
+                                    "//",
+                                    "/",
+                                ),
+                            ) // replace ensures that there's at least one trailing slash prefix
+                            .build()
+                            .toString()
+                    },
+                )
+            }.ifEmpty {
+                document.select("div.container-chapter-reader > img").mapIndexed { i, img ->
+                    Page(
+                        i,
+                        document.location(),
+                        img.absUrl("src"),
+                    )
+                }
             }
         }
-
-        if (prev != null) {
-            pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
-        }
-
-        return pageList
     }
 
     override fun imageRequest(page: Page): Request = GET(page.imageUrl!!, headers).newBuilder()
@@ -598,7 +626,7 @@ abstract class MangaBox(
         CheckBoxPreference(screen.context).apply {
             key = PREF_MERGE_IMAGES
             title = "Merge Images"
-            summary = "Merge split images. All images in the chapter will be loaded before they are displayed."
+            summary = "Merge split images. All images in the chapter will be loaded before they are displayed (no lazy loading)."
             setDefaultValue(false)
 
             setOnPreferenceChangeListener { _, newValue ->
