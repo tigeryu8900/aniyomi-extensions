@@ -18,6 +18,60 @@
     ]
   },
   {
+    "name": "Aniyomi: Mangabat",
+    "pkg": "eu.kanade.tachiyomi.extension.en.mangabat",
+    "apk": "aniyomi-en.mangabat-v1.4.18.apk",
+    "lang": "en",
+    "code": 18,
+    "version": "1.4.18",
+    "nsfw": 1,
+    "sources": [
+      {
+        "name": "Mangabat",
+        "lang": "en",
+        "id": "4215511432986138970",
+        "baseUrl": "https://www.mangabats.com",
+        "versionId": 1
+      }
+    ]
+  },
+  {
+    "name": "Aniyomi: Mangakakalot",
+    "pkg": "eu.kanade.tachiyomi.extension.en.mangakakalot",
+    "apk": "aniyomi-en.mangakakalot-v1.4.18.apk",
+    "lang": "en",
+    "code": 18,
+    "version": "1.4.18",
+    "nsfw": 1,
+    "sources": [
+      {
+        "name": "Mangakakalot",
+        "lang": "en",
+        "id": "2528986671771677900",
+        "baseUrl": "https://www.mangakakalot.gg",
+        "versionId": 1
+      }
+    ]
+  },
+  {
+    "name": "Aniyomi: Manganato",
+    "pkg": "eu.kanade.tachiyomi.extension.en.manganelo",
+    "apk": "aniyomi-en.manganelo-v1.4.16.apk",
+    "lang": "en",
+    "code": 16,
+    "version": "1.4.16",
+    "nsfw": 1,
+    "sources": [
+      {
+        "name": "Manganato",
+        "lang": "en",
+        "id": "1024627298672457456",
+        "baseUrl": "https://www.natomanga.com",
+        "versionId": 1
+      }
+    ]
+  },
+  {
     "name": "Aniyomi: RitharScans",
     "pkg": "eu.kanade.tachiyomi.extension.en.ritharscans",
     "apk": "aniyomi-en.ritharscans-v1.4.20.apk",
