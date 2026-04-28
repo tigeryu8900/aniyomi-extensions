@@ -2,6 +2,9 @@ package eu.kanade.tachiyomi.multisrc.mangabox
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
@@ -19,17 +22,22 @@ import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.IOException
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
 import java.util.regex.Pattern
-import kotlin.text.split
 
 abstract class MangaBox(
     override val name: String,
@@ -49,6 +57,10 @@ abstract class MangaBox(
     override val baseUrl: String get() = mirror
 
     override val client: OkHttpClient = network.cloudflareClient.newBuilder()
+        .addInterceptor(::useBlobInterceptor)
+        .build()
+
+    private val imageClient: OkHttpClient = network.cloudflareClient.newBuilder()
         .addInterceptor(::useAltCdnInterceptor)
         .build()
 
@@ -79,6 +91,8 @@ abstract class MangaBox(
 
     private val cdnSet =
         MangaBoxLinkedCdnSet() // Stores all unique CDNs that the extension can use to retrieve chapter images
+
+    private var blobMap = mutableMapOf<String, ResponseBody>()
 
     private class MangaBoxFallBackTag // Custom empty class tag to use as an identifier that the specific request is fallback-able
 
@@ -150,6 +164,21 @@ abstract class MangaBox(
 
         // If all CDNs fail, throw an error
         return throw IOException("All CDN attempts failed.")
+    }
+
+    private fun useBlobInterceptor(chain: Interceptor.Chain): Response {
+        val url = chain.request().url.toString()
+        return if (url.startsWith("https://127.0.0.1/?blob=")) {
+            val id = url.substringAfter('=')
+            Response.Builder().body(blobMap.remove(id)!!)
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_0)
+                .code(200)
+                .message("")
+                .build()
+        } else {
+            chain.proceed(chain.request())
+        }
     }
 
     override fun headersBuilder(): Headers.Builder = super.headersBuilder()
@@ -374,6 +403,19 @@ abstract class MangaBox(
         return arrayValues
     }
 
+    private fun getByteArray(imageUrl: String): ByteArray = imageClient.newCall(
+        GET(imageUrl, headers).newBuilder()
+            .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
+    ).execute().body.bytes()
+
+    private fun bitmapToObjectURL(bmp: Bitmap): String {
+        val stream = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        val id = UUID.randomUUID().toString()
+        blobMap[id] = stream.toByteArray().toResponseBody(IMAGE_PNG)
+        return "https://127.0.0.1/?blob=$id"
+    }
+
     override fun pageListParse(document: Document): List<Page> {
         val content = document.select("script:containsData(cdns =)").joinToString("\n") { it.data() }
         val cdns =
@@ -383,25 +425,56 @@ abstract class MangaBox(
         // Add all parsed cdns to set
         cdnSet.addAll(cdns)
 
-        return chapterImages.mapIndexed { i, imagePath ->
-            val parsedUrl = cdns[0].toHttpUrl().run {
-                newBuilder()
-                    .encodedPath(
-                        "/$imagePath".replace(
-                            "//",
-                            "/",
-                        ),
-                    ) // replace ensures that there's at least one trailing slash prefix
-                    .build()
-                    .toString()
-            }
-
-            Page(i, document.location(), parsedUrl)
+        val images = chapterImages.map { imagePath ->
+            getByteArray(
+                cdns[0].toHttpUrl().run {
+                    newBuilder()
+                        .encodedPath(
+                            "/$imagePath".replace(
+                                "//",
+                                "/",
+                            ),
+                        ) // replace ensures that there's at least one trailing slash prefix
+                        .build()
+                        .toString()
+                },
+            )
         }.ifEmpty {
-            document.select("div.container-chapter-reader > img").mapIndexed { i, img ->
-                Page(i, imageUrl = img.absUrl("src"))
+            document.select("div.container-chapter-reader > img").map { img ->
+                getByteArray(img.absUrl("src"))
             }
         }
+
+        val pageList = mutableListOf<Page>()
+
+        var prev: Bitmap? = null
+
+        for (image in images) {
+            val curr = BitmapFactory.decodeByteArray(image, 0, image.size)
+            if (prev != null) {
+                if (curr.width == prev.width && curr.width > 4 * curr.height) {
+                    val cs = Bitmap.createBitmap(prev.width, prev.height + curr.height, prev.config)
+
+                    val comboImage = Canvas(cs)
+                    comboImage.drawBitmap(prev, 0f, 0f, null)
+                    comboImage.drawBitmap(curr, prev.width.toFloat(), 0f, null)
+
+                    pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(cs)))
+                    prev = null
+                } else {
+                    pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
+                    prev = curr
+                }
+            } else {
+                prev = curr
+            }
+        }
+
+        if (prev != null) {
+            pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(prev)))
+        }
+
+        return pageList
     }
 
     override fun imageRequest(page: Page): Request = GET(page.imageUrl!!, headers).newBuilder()
@@ -523,5 +596,6 @@ abstract class MangaBox(
         private const val PREF_USE_MIRROR = "pref_use_mirror"
         private const val CHAPTER_LIST_TAKE = 1000
         private const val URL_PREFIX = "https://"
+        private val IMAGE_PNG = "image/png".toMediaType()
     }
 }
