@@ -1,8 +1,8 @@
 [
   {
-    "name": "Aniyomi: Art Lapsa",
+    "name": "Tachiyomi: Art Lapsa",
     "pkg": "eu.kanade.tachiyomi.extension.en.artlapsa",
-    "apk": "aniyomi-en.artlapsa-v1.4.21.apk",
+    "apk": "tachiyomi-en.artlapsa-v1.4.21.apk",
     "lang": "en",
     "code": 21,
     "version": "1.4.21",
@@ -18,9 +18,9 @@
     ]
   },
   {
-    "name": "Aniyomi: Mangabat",
+    "name": "Tachiyomi: Mangabat",
     "pkg": "eu.kanade.tachiyomi.extension.en.mangabat",
-    "apk": "aniyomi-en.mangabat-v1.4.18.apk",
+    "apk": "tachiyomi-en.mangabat-v1.4.18.apk",
     "lang": "en",
     "code": 18,
     "version": "1.4.18",
@@ -36,9 +36,9 @@
     ]
   },
   {
-    "name": "Aniyomi: Mangakakalot",
+    "name": "Tachiyomi: Mangakakalot",
     "pkg": "eu.kanade.tachiyomi.extension.en.mangakakalot",
-    "apk": "aniyomi-en.mangakakalot-v1.4.18.apk",
+    "apk": "tachiyomi-en.mangakakalot-v1.4.18.apk",
     "lang": "en",
     "code": 18,
     "version": "1.4.18",
@@ -54,9 +54,9 @@
     ]
   },
   {
-    "name": "Aniyomi: Manganato",
+    "name": "Tachiyomi: Manganato",
     "pkg": "eu.kanade.tachiyomi.extension.en.manganelo",
-    "apk": "aniyomi-en.manganelo-v1.4.16.apk",
+    "apk": "tachiyomi-en.manganelo-v1.4.16.apk",
     "lang": "en",
     "code": 16,
     "version": "1.4.16",
@@ -72,9 +72,9 @@
     ]
   },
   {
-    "name": "Aniyomi: RitharScans",
+    "name": "Tachiyomi: RitharScans",
     "pkg": "eu.kanade.tachiyomi.extension.en.ritharscans",
-    "apk": "aniyomi-en.ritharscans-v1.4.20.apk",
+    "apk": "tachiyomi-en.ritharscans-v1.4.20.apk",
     "lang": "en",
     "code": 20,
     "version": "1.4.20",
