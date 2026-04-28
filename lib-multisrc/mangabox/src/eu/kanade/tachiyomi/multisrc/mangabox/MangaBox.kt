@@ -628,6 +628,5 @@ abstract class MangaBox(
         private const val PREF_MERGE_IMAGES = "pref_merge_images"
         private const val CHAPTER_LIST_TAKE = 1000
         private const val URL_PREFIX = "https://"
-        private val IMAGE_PNG = "image/png".toMediaType()
     }
 }
