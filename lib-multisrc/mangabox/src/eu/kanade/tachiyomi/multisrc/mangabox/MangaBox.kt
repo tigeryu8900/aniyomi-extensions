@@ -455,9 +455,9 @@ abstract class MangaBox(
                 if (curr.width == prev.width && curr.width > 4 * curr.height) {
                     val cs = Bitmap.createBitmap(prev.width, prev.height + curr.height, prev.config)
 
-                    val comboImage = Canvas(cs)
-                    comboImage.drawBitmap(prev, 0f, 0f, null)
-                    comboImage.drawBitmap(curr, prev.width.toFloat(), 0f, null)
+                    val canvas = Canvas(cs)
+                    canvas.drawBitmap(prev, 0f, 0f, null)
+                    canvas.drawBitmap(curr, 0f, prev.height.toFloat(), null)
 
                     pageList.add(Page(pageList.size, imageUrl = bitmapToObjectURL(cs)))
                     prev = null
