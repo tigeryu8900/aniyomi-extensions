@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
@@ -57,14 +58,12 @@ abstract class MangaBox(
     override val baseUrl: String get() = mirror
 
     override val client: OkHttpClient = network.cloudflareClient.newBuilder()
-        .addInterceptor(::useBlobInterceptor)
-        .build()
-
-    private val imageClient: OkHttpClient = network.cloudflareClient.newBuilder()
-        .addInterceptor(::useAltCdnInterceptor)
+        .addInterceptor(::interceptor)
         .build()
 
     private fun SharedPreferences.getMirrorPref(): String = getString(PREF_USE_MIRROR, mirrorEntries[0])!!
+
+    private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
 
     private val preferences: SharedPreferences by getPreferencesLazy {
         // if current mirror is not in mirrorEntries, set default
@@ -80,6 +79,16 @@ abstract class MangaBox(
             }
 
             field = preferences.getMirrorPref()
+            return field
+        }
+
+    private var mergeImages: Boolean? = null
+        get() {
+            if (field != null) {
+                return field
+            }
+
+            field = preferences.getMergeImagesPref()
             return field
         }
 
@@ -103,81 +112,76 @@ abstract class MangaBox(
         }
     }"
 
-    private fun useAltCdnInterceptor(chain: Interceptor.Chain): Response {
+    private fun interceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        if (cdnSet.isEmpty()) {
-            return chain.proceed(request)
-        }
-        val requestTag = request.tag(MangaBoxFallBackTag::class.java)
-        val originalResponse: Response? = try {
-            chain.proceed(request)
-        } catch (e: IOException) {
-            if (requestTag == null) {
-                throw e
-            } else {
-                null
-            }
-        }
-
-        if (requestTag == null || originalResponse?.isSuccessful == true) {
-            requestTag?.let {
-                // Move working cdn to first so it gets priority during iteration
-                cdnSet.moveItemToFirst(request.url.getBaseUrl())
-            }
-
-            return originalResponse!!
-        }
-
-        // Close the original response if it's not successful
-        originalResponse?.close()
-
-        for (cdnUrl in cdnSet) {
-            var tryResponse: Response? = null
-
-            try {
-                val newUrl = cdnUrl.toHttpUrl().newBuilder()
-                    .encodedPath(request.url.encodedPath)
-                    .fragment(request.url.fragment)
-                    .build()
-
-                // Create a new request with the updated URL
-                val newRequest = request.newBuilder()
-                    .url(newUrl)
-                    .build()
-
-                // Proceed with the new request
-                tryResponse = chain.proceed(newRequest)
-
-                // Check if the response is successful
-                if (tryResponse.isSuccessful) {
-                    // Move working cdn to first so it gets priority during iteration
-                    cdnSet.moveItemToFirst(newRequest.url.getBaseUrl())
-
-                    return tryResponse
-                }
-
-                tryResponse.close()
-            } catch (_: IOException) {
-                tryResponse?.close()
-            }
-        }
-
-        // If all CDNs fail, throw an error
-        return throw IOException("All CDN attempts failed.")
-    }
-
-    private fun useBlobInterceptor(chain: Interceptor.Chain): Response {
-        val url = chain.request().url.toString()
-        return if (url.startsWith("https://127.0.0.1/?blob=")) {
+        val url = request.url.toString()
+        if (url.startsWith("https://127.0.0.1/?blob=")) { // blob
             val id = url.substringAfter('=')
-            Response.Builder().body(blobMap.remove(id)!!)
+            return Response.Builder().body(blobMap.remove(id)!!)
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_0)
                 .code(200)
                 .message("")
                 .build()
+        } else if (cdnSet.isNotEmpty()) { // alt cdn
+            val requestTag = request.tag(MangaBoxFallBackTag::class.java)
+            val originalResponse: Response? = try {
+                chain.proceed(request)
+            } catch (e: IOException) {
+                if (requestTag == null) {
+                    throw e
+                } else {
+                    null
+                }
+            }
+
+            if (requestTag == null || originalResponse?.isSuccessful == true) {
+                requestTag?.let {
+                    // Move working cdn to first so it gets priority during iteration
+                    cdnSet.moveItemToFirst(request.url.getBaseUrl())
+                }
+
+                return originalResponse!!
+            }
+
+            // Close the original response if it's not successful
+            originalResponse?.close()
+
+            for (cdnUrl in cdnSet) {
+                var tryResponse: Response? = null
+
+                try {
+                    val newUrl = cdnUrl.toHttpUrl().newBuilder()
+                        .encodedPath(request.url.encodedPath)
+                        .fragment(request.url.fragment)
+                        .build()
+
+                    // Create a new request with the updated URL
+                    val newRequest = request.newBuilder()
+                        .url(newUrl)
+                        .build()
+
+                    // Proceed with the new request
+                    tryResponse = chain.proceed(newRequest)
+
+                    // Check if the response is successful
+                    if (tryResponse.isSuccessful) {
+                        // Move working cdn to first so it gets priority during iteration
+                        cdnSet.moveItemToFirst(newRequest.url.getBaseUrl())
+
+                        return tryResponse
+                    }
+
+                    tryResponse.close()
+                } catch (_: IOException) {
+                    tryResponse?.close()
+                }
+            }
+
+            // If all CDNs fail, throw an error
+            throw IOException("All CDN attempts failed.")
         } else {
-            chain.proceed(chain.request())
+            return chain.proceed(request)
         }
     }
 
@@ -403,7 +407,7 @@ abstract class MangaBox(
         return arrayValues
     }
 
-    private fun getByteArray(imageUrl: String): ByteArray = imageClient.newCall(
+    private fun getByteArray(imageUrl: String): ByteArray = client.newCall(
         GET(imageUrl, headers).newBuilder()
             .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
     ).execute().body.bytes()
@@ -590,10 +594,24 @@ abstract class MangaBox(
                 true
             }
         }.let(screen::addPreference)
+
+        CheckBoxPreference(screen.context).apply {
+            key = PREF_MERGE_IMAGES
+            title = "Merge Images"
+            summary = "Merge split images. All images in the chapter will be loaded before they are displayed."
+            setDefaultValue(false)
+
+            setOnPreferenceChangeListener { _, newValue ->
+                // Update values
+                mergeImages = newValue as Boolean
+                true
+            }
+        }.let(screen::addPreference)
     }
 
     companion object {
         private const val PREF_USE_MIRROR = "pref_use_mirror"
+        private const val PREF_MERGE_IMAGES = "pref_merge_images"
         private const val CHAPTER_LIST_TAKE = 1000
         private const val URL_PREFIX = "https://"
         private val IMAGE_PNG = "image/png".toMediaType()
