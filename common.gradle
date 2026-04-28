@@ -38,11 +38,11 @@ android {
         versionCode = theme == null ? extVersionCode : theme.baseVersionCode + overrideVersionCode
         versionName = "1.4.$versionCode"
         base {
-            archivesName = "aniyomi-$applicationIdSuffix-v$versionName"
+            archivesName = "tachiyomi-$applicationIdSuffix-v$versionName"
         }
         assert extClass.startsWith(".")
         manifestPlaceholders = [
-                appName : "Aniyomi: $extName",
+                appName : "Tachiyomi: $extName",
                 extClass: extClass,
                 nsfw    : project.ext.find("isNsfw") ? 1 : 0,
         ]

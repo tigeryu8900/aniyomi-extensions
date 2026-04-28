@@ -87,7 +87,7 @@ jobs:
 
       - name: Upload APKs (${{ matrix.chunk.number }})
         uses: actions/upload-artifact@v7
-        if: "github.repository == 'tigeryu8900/aniyomi-extensions'"
+        if: "github.repository == 'tigeryu8900/tachiyomi-extensions'"
         with:
           name: "individual-apks-${{ matrix.chunk.number }}"
           path: "**/*.apk"
@@ -99,7 +99,7 @@ jobs:
   publish:
     name: Publish extension repo
     needs: [prepare, build]
-    if: "github.repository == 'tigeryu8900/aniyomi-extensions'"
+    if: "github.repository == 'tigeryu8900/tachiyomi-extensions'"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -133,7 +133,7 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@v6
         with:
-          repository: tigeryu8900/aniyomi-extensions
+          repository: tigeryu8900/tachiyomi-extensions
           token: ${{ secrets.PAT }}
           ref: repo
           path: repo
