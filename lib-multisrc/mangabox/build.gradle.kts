@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":lib:dataimage"))
+    implementation(project(":lib:imagesize"))
 }
 
 baseVersionCode = 11
