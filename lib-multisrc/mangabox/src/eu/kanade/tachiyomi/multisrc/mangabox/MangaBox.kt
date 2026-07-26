@@ -444,7 +444,7 @@ abstract class MangaBox :
         } ?: emptyList()
     }
 
-    open suspend fun parsePageList(response: Response): List<Page> = withContext(Dispatchers.IO) {
+    open fun parsePageList(response: Response): List<Page> = run {
         val document = response.asJsoup()
         val content = document.select("script:containsData(cdns =)").joinToString("\n") { it.data() }
         val cdns = extractArray(content, cdnsRegex) + extractArray(content, backupImageRegex)
