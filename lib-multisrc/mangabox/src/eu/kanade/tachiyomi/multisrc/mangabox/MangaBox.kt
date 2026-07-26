@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.network.get
+import keiyoushi.network.rateLimit
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
@@ -49,6 +50,8 @@ abstract class MangaBox :
     override fun OkHttpClient.Builder.configureClient(): OkHttpClient.Builder = apply {
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
+        addInterceptor(::fixRequestHeadersInterceptor)
+        rateLimit(5) { it.encodedPath.endsWith(".webp") }
     }
 
     private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
@@ -194,6 +197,29 @@ abstract class MangaBox :
 
         // If all CDNs fail, throw an error
         throw IOException("All CDN attempts failed.")
+    }
+
+    private fun fixRequestHeadersInterceptor(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val response = chain.proceed(
+            if (request.url.getBaseUrl() != baseUrl) {
+                request
+                    .newBuilder()
+                    .headers(
+                        request
+                            .headers
+                            .newBuilder()
+                            .set("Referer", "$baseUrl/")
+                            .set("Origin", baseUrl)
+                            .configureHeaders()
+                            .build(),
+                    )
+                    .build()
+            } else {
+                request
+            },
+        )
+        return response
     }
 
     open val popularUrlPath = "manga-list/hot-manga?page="
@@ -441,52 +467,57 @@ abstract class MangaBox :
         }
 
         return if (mergeImages == true) {
-            val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
+            coroutineScope {
+                val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
 
-            val calls = imageUrls.map { url ->
-                client.newCall(
-                    GET(url, headers).newBuilder()
-                        .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
-                )
-            }
-
-            val imageList = mutableListOf<MergeImage>()
-
-            for ((url, call) in imageUrls.zip(calls)) {
-                val response = call.await()
-                val size = if (response.isSuccessful) {
-                    WebpSizeGetter(response.body.byteStream()).get()
-                } else {
-                    null
+                val deferredSizes = imageUrls.map { url ->
+                    async {
+                        try {
+                            val response = client.newCall(
+                                GET(url, headers).newBuilder()
+                                    .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
+                            ).await()
+                            val result = WebpSizeGetter(response.body.byteStream()).get()
+                            result
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
                 }
-                val prev = imageList.lastOrNull()
-                val prevSize = prev?.size
-                if (
-                    // size is known
-                    size != null &&
 
-                    // previous size is known
-                    prevSize != null &&
+                val imageList = mutableListOf<MergeImage>()
 
-                    // widths are equal
-                    size.w == prevSize.w &&
+                for ((url, deferredSize) in imageUrls.zip(deferredSizes)) {
+                    val size = deferredSize.await()
+                    val prev = imageList.lastOrNull()
+                    val prevSize = prev?.size
+                    if (
+                        // size is known
+                        size != null &&
 
-                    // merged image is not too long
-                    3 * prevSize.w > 2 * prevSize.h + size.h
-                ) {
-                    prev.urls.add(url)
-                    prevSize.h += size.h
-                } else {
-                    imageList.add(MergeImage(mutableListOf(url), size))
+                        // previous size is known
+                        prevSize != null &&
+
+                        // widths are equal
+                        size.w == prevSize.w &&
+
+                        // merged image is not too long
+                        3 * prevSize.w > 2 * prevSize.h + size.h
+                    ) {
+                        prev.urls.add(url)
+                        prevSize.h += size.h
+                    } else {
+                        imageList.add(MergeImage(mutableListOf(url), size))
+                    }
                 }
-            }
 
-            imageList.mapIndexed { i, image ->
-                Page(
-                    i,
-                    url = document.location(),
-                    imageUrl = image.toString(),
-                )
+                imageList.mapIndexed { i, image ->
+                    Page(
+                        i,
+                        url = document.location(),
+                        imageUrl = image.toString(),
+                    )
+                }
             }
         } else {
             imageUrls.mapIndexed { i, url ->
