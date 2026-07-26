@@ -21,7 +21,6 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.network.get
-import keiyoushi.network.rateLimit
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
@@ -51,7 +50,6 @@ abstract class MangaBox :
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
         addInterceptor(::fixRequestHeadersInterceptor)
-        rateLimit(5) { it.encodedPath.endsWith(".webp") }
     }
 
     private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
