@@ -444,7 +444,7 @@ abstract class MangaBox :
         } ?: emptyList()
     }
 
-    open suspend fun parsePageList(response: Response): List<Page> {
+    open suspend fun parsePageList(response: Response): List<Page> = withContext(Dispatchers.IO) {
         val document = response.asJsoup()
         val content = document.select("script:containsData(cdns =)").joinToString("\n") { it.data() }
         val cdns = extractArray(content, cdnsRegex) + extractArray(content, backupImageRegex)
@@ -475,7 +475,7 @@ abstract class MangaBox :
             )
         }
 
-        return if (mergeImages == true) {
+        if (mergeImages == true) {
             val latch = CountDownLatch(numImages)
             val sizes = MutableList<ImageSize?>(numImages) { null }
             val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
@@ -498,9 +498,7 @@ abstract class MangaBox :
                 )
             }
 
-            withContext(Dispatchers.IO) {
-                latch.await()
-            }
+            latch.await()
 
             val imageList = mutableListOf<MergeImage>()
 
