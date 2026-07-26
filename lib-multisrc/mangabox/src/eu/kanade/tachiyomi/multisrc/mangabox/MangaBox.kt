@@ -24,9 +24,13 @@ import keiyoushi.network.get
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -40,6 +44,7 @@ import okio.Buffer
 import okio.IOException
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.util.concurrent.CountDownLatch
 import kotlin.time.Instant
 
 abstract class MangaBox :
@@ -448,74 +453,86 @@ abstract class MangaBox :
         // Add all parsed cdns to set
         cdnSet.addAll(cdns)
 
-        val imageUrls = if (chapterImages.isNotEmpty()) {
+        val (numImages, imageUrls) = if (chapterImages.isNotEmpty()) {
             val httpUrl = cdns[0].toHttpUrl()
-            chapterImages.asSequence().map { imagePath ->
-                httpUrl
-                    .newBuilder()
-                    .encodedPath("/$imagePath".replace("//", "/")) // replace ensures that there's at least one trailing slash prefix
-                    .build()
-                    .toString()
-            }
+            Pair(
+                chapterImages.size,
+                chapterImages.asSequence().map { imagePath ->
+                    httpUrl
+                        .newBuilder()
+                        .encodedPath("/$imagePath".replace("//", "/")) // replace ensures that there's at least one trailing slash prefix
+                        .build()
+                        .toString()
+                },
+            )
         } else {
             val elements = document.select("div.container-chapter-reader > img")
-            elements.asSequence().map { img ->
-                img.absUrl("src")
-            }
+            Pair(
+                elements.size,
+                elements.asSequence().map { img ->
+                    img.absUrl("src")
+                },
+            )
         }
 
         return if (mergeImages == true) {
-            coroutineScope {
-                val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
+            val latch = CountDownLatch(numImages)
+            val sizes = MutableList<ImageSize?>(numImages) { null }
+            val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
 
-                val deferredSizes = imageUrls.map { url ->
-                    async {
-                        try {
-                            val response = client.newCall(
-                                GET(url, headers).newBuilder()
-                                    .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
-                            ).await()
-                            val result = WebpSizeGetter(response.body.byteStream()).get()
-                            result
-                        } catch (_: Exception) {
-                            null
+            imageUrls.forEachIndexed { i, url ->
+                client.newCall(
+                    GET(url, headers).newBuilder()
+                        .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
+                ).enqueue(
+                    object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            latch.countDown()
                         }
-                    }
+
+                        override fun onResponse(call: Call, response: Response) {
+                            sizes[i] = WebpSizeGetter(response.body.byteStream()).get()
+                            latch.countDown()
+                        }
+                    },
+                )
+            }
+
+            withContext(Dispatchers.IO) {
+                latch.await()
+            }
+
+            val imageList = mutableListOf<MergeImage>()
+
+            for ((url, size) in imageUrls.zip(sizes.asSequence())) {
+                val prev = imageList.lastOrNull()
+                val prevSize = prev?.size
+                if (
+                // size is known
+                    size != null &&
+
+                    // previous size is known
+                    prevSize != null &&
+
+                    // widths are equal
+                    size.w == prevSize.w &&
+
+                    // merged image is not too long
+                    3 * prevSize.w > 2 * prevSize.h + size.h
+                ) {
+                    prev.urls.add(url)
+                    prevSize.h += size.h
+                } else {
+                    imageList.add(MergeImage(mutableListOf(url), size))
                 }
+            }
 
-                val imageList = mutableListOf<MergeImage>()
-
-                for ((url, deferredSize) in imageUrls.zip(deferredSizes)) {
-                    val size = deferredSize.await()
-                    val prev = imageList.lastOrNull()
-                    val prevSize = prev?.size
-                    if (
-                        // size is known
-                        size != null &&
-
-                        // previous size is known
-                        prevSize != null &&
-
-                        // widths are equal
-                        size.w == prevSize.w &&
-
-                        // merged image is not too long
-                        3 * prevSize.w > 2 * prevSize.h + size.h
-                    ) {
-                        prev.urls.add(url)
-                        prevSize.h += size.h
-                    } else {
-                        imageList.add(MergeImage(mutableListOf(url), size))
-                    }
-                }
-
-                imageList.mapIndexed { i, image ->
-                    Page(
-                        i,
-                        url = document.location(),
-                        imageUrl = image.toString(),
-                    )
-                }
+            imageList.mapIndexed { i, image ->
+                Page(
+                    i,
+                    url = document.location(),
+                    imageUrl = image.toString(),
+                )
             }
         } else {
             imageUrls.mapIndexed { i, url ->
