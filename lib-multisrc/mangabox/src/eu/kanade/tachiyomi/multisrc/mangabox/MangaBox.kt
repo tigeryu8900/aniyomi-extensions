@@ -210,8 +210,6 @@ abstract class MangaBox :
                             .headers
                             .newBuilder()
                             .set("Referer", "$baseUrl/")
-                            .set("Origin", baseUrl)
-                            .configureHeaders()
                             .build(),
                     )
                     .build()
