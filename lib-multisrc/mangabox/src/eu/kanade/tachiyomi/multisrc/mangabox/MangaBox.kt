@@ -54,7 +54,7 @@ abstract class MangaBox :
     override fun OkHttpClient.Builder.configureClient(): OkHttpClient.Builder = apply {
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
-        addInterceptor(::retry429Interceptor)
+//        addInterceptor(::retry429Interceptor)
 //        rateLimit(
 //            permits = 5,
 //            period = 1.seconds,
@@ -162,13 +162,13 @@ abstract class MangaBox :
         request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
         val url = request.url
 
-        if (mergeImages == true) {
-            // Use cached response from merging images
-            val cachedResponse = imageResponseCache.remove(url.encodedPath to url.fragment)
-            if (cachedResponse != null) {
-                return cachedResponse
-            }
-        }
+//        if (mergeImages == true) {
+//            // Use cached response from merging images
+//            val cachedResponse = imageResponseCache.remove(url.encodedPath to url.fragment)
+//            if (cachedResponse != null) {
+//                return cachedResponse
+//            }
+//        }
 
         if (cdnSet.isEmpty()) {
             return chain.proceed(request)
@@ -240,7 +240,7 @@ abstract class MangaBox :
                     sl.unlockRead(stamp)
                     stamp = sl.writeLock()
                 }
-                Thread.sleep(1000)
+                Thread.sleep(5000)
 
                 // Retry while holding write lock to minimize chances of another 429
                 response = chain.proceed(request)
@@ -500,11 +500,25 @@ abstract class MangaBox :
                 val deferredSizes = imageUrls.map { url ->
                     async {
                         try {
-                            val response = client.newCall(imageRequest(url)).awaitSuccess()
-                            val result = WebpSizeGetter(response.peekBody(WebpSizeGetter.BYTES).byteStream()).get()
+//                            val response = client.newCall(imageRequest(url)).awaitSuccess()
+                            val request = imageRequest(url)
+                            val response = client.newCall(
+                                request
+                                    .newBuilder()
+                                    .headers(
+                                        request
+                                            .headers
+                                            .newBuilder()
+                                            .set("Range", WebpSizeGetter.RANGE)
+                                            .build(),
+                                    )
+                                    .build(),
+                            ).awaitSuccess()
+//                            val result = WebpSizeGetter(response.peekBody(WebpSizeGetter.BYTES).byteStream()).get()
+                            val result = WebpSizeGetter(response.body.byteStream()).get()
 
-                            val httpUrl = url.toHttpUrl()
-                            imageResponseCache.put(httpUrl.encodedPath to httpUrl.fragment, response)
+//                            val httpUrl = url.toHttpUrl()
+//                            imageResponseCache.put(httpUrl.encodedPath to httpUrl.fragment, response)
 
                             result
                         } catch (_: Exception) {
