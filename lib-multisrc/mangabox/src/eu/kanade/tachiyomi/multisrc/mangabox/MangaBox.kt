@@ -57,11 +57,11 @@ abstract class MangaBox :
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
         addInterceptor(::retry429Interceptor)
-        rateLimit(
-            permits = 5,
-            period = 1.seconds,
-            interval = 200.milliseconds,
-        ) { it.encodedPath.endsWith(".webp") }
+//        rateLimit(
+//            permits = 5,
+//            period = 1.seconds,
+//            interval = 200.milliseconds,
+//        ) { it.encodedPath.endsWith(".webp") }
     }
 
     private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
