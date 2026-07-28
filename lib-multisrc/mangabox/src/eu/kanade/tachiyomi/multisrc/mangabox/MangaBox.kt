@@ -5,11 +5,13 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.util.LruCache
 import androidx.preference.CheckBoxPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.multisrc.mangabox.imagesize.ImageSize
 import eu.kanade.tachiyomi.multisrc.mangabox.imagesize.WebpSizeGetter
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -20,14 +22,14 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.network.get
+import keiyoushi.network.rateLimit
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonElement
-import okhttp3.Call
-import okhttp3.Callback
+import okhttp3.CacheControl
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -41,7 +43,10 @@ import okio.Buffer
 import okio.IOException
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.StampedLock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 abstract class MangaBox :
@@ -51,7 +56,12 @@ abstract class MangaBox :
     override fun OkHttpClient.Builder.configureClient(): OkHttpClient.Builder = apply {
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
-        addInterceptor(::fixRequestHeadersInterceptor)
+        addInterceptor(::retry429Interceptor)
+        rateLimit(
+            permits = 5,
+            period = 1.seconds,
+            interval = 200.milliseconds,
+        ) { it.encodedPath.endsWith(".webp") }
     }
 
     private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
@@ -85,6 +95,19 @@ abstract class MangaBox :
             else -> ":${this.port}"
         }
     }"
+
+    // We cannot use OkHttp's cache because caching requires the entire body to be exhausted first,
+    // and we only need the first 30 bytes when determining image size
+    private val imageResponseCache by lazy {
+        object : LruCache<Pair<String, String?>, Response>(256) {
+            override fun entryRemoved(evicted: Boolean, key: Pair<String, String?>?, oldValue: Response?, newValue: Response?) {
+                if (evicted) {
+                    oldValue?.close()
+                }
+                super.entryRemoved(evicted, key, oldValue, newValue)
+            }
+        }
+    }
 
     private fun mergeImagesInterceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -138,86 +161,96 @@ abstract class MangaBox :
 
     private fun useAltCdnInterceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
+        val url = request.url
+
+        if (mergeImages == true) {
+            // Use cached response from merging images
+            val cachedResponse = imageResponseCache.remove(url.encodedPath to url.fragment)
+            if (cachedResponse != null) {
+                return cachedResponse
+            }
+        }
+
         if (cdnSet.isEmpty()) {
             return chain.proceed(request)
         }
-        val requestTag = request.tag(MangaBoxFallBackTag::class.java)
+
         val originalResponse: Response? = try {
             chain.proceed(request)
-        } catch (e: IOException) {
-            if (requestTag == null) {
-                throw e
-            } else {
-                null
-            }
+        } catch (_: IOException) {
+            null
         }
 
-        if (requestTag == null || originalResponse?.isSuccessful == true) {
-            requestTag?.let {
-                // Move working cdn to first so it gets priority during iteration
-                cdnSet.moveItemToFirst(request.url.getBaseUrl())
-            }
+        if (originalResponse?.isSuccessful == true) {
+            // Move working cdn to first so it gets priority during iteration
+            cdnSet.moveItemToFirst(url.getBaseUrl())
 
-            return originalResponse!!
+            return originalResponse
         }
 
         // Close the original response if it's not successful
         originalResponse?.close()
 
         for (cdnUrl in cdnSet) {
-            var tryResponse: Response? = null
+            val newUrl = cdnUrl.toHttpUrl().newBuilder()
+                .encodedPath(request.url.encodedPath)
+                .fragment(request.url.fragment)
+                .build()
+
+            // Create a new request with the updated URL
+            val newRequest = request.newBuilder()
+                .url(newUrl)
+                .build()
 
             try {
-                val newUrl = cdnUrl.toHttpUrl().newBuilder()
-                    .encodedPath(request.url.encodedPath)
-                    .fragment(request.url.fragment)
-                    .build()
-
-                // Create a new request with the updated URL
-                val newRequest = request.newBuilder()
-                    .url(newUrl)
-                    .build()
-
                 // Proceed with the new request
-                tryResponse = chain.proceed(newRequest)
+                chain.proceed(newRequest).use { tryResponse ->
 
-                // Check if the response is successful
-                if (tryResponse.isSuccessful) {
-                    // Move working cdn to first so it gets priority during iteration
-                    cdnSet.moveItemToFirst(newRequest.url.getBaseUrl())
+                    // Check if the response is successful
+                    if (tryResponse.isSuccessful) {
+                        // Move working cdn to first so it gets priority during iteration
+                        cdnSet.moveItemToFirst(newRequest.url.getBaseUrl())
 
-                    return tryResponse
+                        return tryResponse
+                    }
                 }
-
-                tryResponse.close()
-            } catch (_: IOException) {
-                tryResponse?.close()
-            }
+            } catch (_: IOException) {}
         }
 
         // If all CDNs fail, throw an error
         throw IOException("All CDN attempts failed.")
     }
 
-    private fun fixRequestHeadersInterceptor(chain: Interceptor.Chain): Response {
+    private val cdnRequestLocks = ConcurrentHashMap<String, StampedLock>()
+
+    private fun retry429Interceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val response = chain.proceed(
-            if (request.url.getBaseUrl() != baseUrl) {
-                request
-                    .newBuilder()
-                    .headers(
-                        request
-                            .headers
-                            .newBuilder()
-                            .set("Referer", "$baseUrl/")
-                            .build(),
-                    )
-                    .build()
-            } else {
-                request
-            },
-        )
-        return response
+        request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
+        val sl = cdnRequestLocks.getOrPut(request.url.getBaseUrl()) { StampedLock() }
+        var stamp = sl.readLock()
+        try {
+            var response = chain.proceed(request)
+            if (response.code == 429) {
+                response.close()
+
+                // Block all requests by converting to write lock
+                val ws = sl.tryConvertToWriteLock(stamp)
+                if (ws != 0L) {
+                    stamp = ws
+                } else {
+                    sl.unlockRead(stamp)
+                    stamp = sl.writeLock()
+                }
+                Thread.sleep(1000)
+
+                // Retry while holding write lock to minimize chances of another 429
+                response = chain.proceed(request)
+            }
+            return response
+        } finally {
+            sl.unlock(stamp)
+        }
     }
 
     open val popularUrlPath = "manga-list/hot-manga?page="
@@ -439,7 +472,7 @@ abstract class MangaBox :
         } ?: emptyList()
     }
 
-    open fun parsePageList(response: Response): List<Page> = run {
+    open suspend fun parsePageList(response: Response): List<Page> {
         val document = response.asJsoup()
         val content = document.select("script:containsData(cdns =)").joinToString("\n") { it.data() }
         val cdns = extractArray(content, cdnsRegex) + extractArray(content, backupImageRegex)
@@ -448,84 +481,73 @@ abstract class MangaBox :
         // Add all parsed cdns to set
         cdnSet.addAll(cdns)
 
-        val (numImages, imageUrls) = if (chapterImages.isNotEmpty()) {
+        val imageUrls = if (chapterImages.isNotEmpty()) {
             val httpUrl = cdns[0].toHttpUrl()
-            Pair(
-                chapterImages.size,
-                chapterImages.asSequence().map { imagePath ->
-                    httpUrl
-                        .newBuilder()
-                        .encodedPath("/$imagePath".replace("//", "/")) // replace ensures that there's at least one trailing slash prefix
-                        .build()
-                        .toString()
-                },
-            )
+            chapterImages.asSequence().map { imagePath ->
+                httpUrl
+                    .newBuilder()
+                    .encodedPath("/$imagePath".replace("//", "/")) // replace ensures that there's at least one trailing slash prefix
+                    .build()
+                    .toString()
+            }
         } else {
             val elements = document.select("div.container-chapter-reader > img")
-            Pair(
-                elements.size,
-                elements.asSequence().map { img ->
-                    img.absUrl("src")
-                },
-            )
+            elements.asSequence().map { img ->
+                img.absUrl("src")
+            }
         }
 
-        if (mergeImages == true) {
-            val latch = CountDownLatch(numImages)
-            val sizes = MutableList<ImageSize?>(numImages) { null }
-            val headers = headersBuilder().set("Range", WebpSizeGetter.RANGE).build()
+        return if (mergeImages == true) {
+            coroutineScope {
+                val deferredSizes = imageUrls.map { url ->
+                    async {
+                        try {
+                            val response = client.newCall(imageRequest(url)).awaitSuccess()
+                            val result = WebpSizeGetter(response.peekBody(WebpSizeGetter.BYTES).byteStream()).get()
 
-            imageUrls.forEachIndexed { i, url ->
-                client.newCall(
-                    GET(url, headers).newBuilder()
-                        .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build(),
-                ).enqueue(
-                    object : Callback {
-                        override fun onFailure(call: Call, e: IOException) {
-                            latch.countDown()
+                            val httpUrl = url.toHttpUrl()
+                            imageResponseCache.put(httpUrl.encodedPath to httpUrl.fragment, response)
+
+                            result
+                        } catch (_: Exception) {
+                            null
                         }
-
-                        override fun onResponse(call: Call, response: Response) {
-                            sizes[i] = WebpSizeGetter(response.body.byteStream()).get()
-                            latch.countDown()
-                        }
-                    },
-                )
-            }
-
-            latch.await()
-
-            val imageList = mutableListOf<MergeImage>()
-
-            for ((url, size) in imageUrls.zip(sizes.asSequence())) {
-                val prev = imageList.lastOrNull()
-                val prevSize = prev?.size
-                if (
-                    // size is known
-                    size != null &&
-
-                    // previous size is known
-                    prevSize != null &&
-
-                    // widths are equal
-                    size.w == prevSize.w &&
-
-                    // merged image is not too long
-                    3 * prevSize.w > 2 * prevSize.h + size.h
-                ) {
-                    prev.urls.add(url)
-                    prevSize.h += size.h
-                } else {
-                    imageList.add(MergeImage(mutableListOf(url), size))
+                    }
                 }
-            }
 
-            imageList.mapIndexed { i, image ->
-                Page(
-                    i,
-                    url = document.location(),
-                    imageUrl = image.toString(),
-                )
+                val imageList = mutableListOf<MergeImage>()
+
+                for ((url, deferredSize) in imageUrls.zip(deferredSizes)) {
+                    val size = deferredSize.await()
+                    val prev = imageList.lastOrNull()
+                    val prevSize = prev?.size
+                    if (
+                        // size is known
+                        size != null &&
+
+                        // previous size is known
+                        prevSize != null &&
+
+                        // widths are equal
+                        size.w == prevSize.w &&
+
+                        // merged image is not too long
+                        3 * prevSize.w > 2 * prevSize.h + size.h
+                    ) {
+                        prev.urls.add(url)
+                        prevSize.h += size.h
+                    } else {
+                        imageList.add(MergeImage(mutableListOf(url), size))
+                    }
+                }
+
+                imageList.mapIndexed { i, image ->
+                    Page(
+                        i,
+                        url = document.location(),
+                        imageUrl = image.toString(),
+                    )
+                }
             }
         } else {
             imageUrls.mapIndexed { i, url ->
@@ -540,8 +562,32 @@ abstract class MangaBox :
 
     override suspend fun getPageList(chapter: SChapter): List<Page> = parsePageList(pageListResponse(chapter))
 
-    override fun imageRequest(page: Page): Request = GET(page.imageUrl!!).newBuilder()
-        .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag()).build()
+    open fun Request.Builder.configureImageRequest(): Request.Builder = apply {
+        tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
+        headers(headersBuilder().build())
+        cacheControl(
+            CacheControl
+                .Builder()
+                .maxAge(31536000.seconds)
+                .immutable()
+                .build(),
+        )
+    }
+
+    open fun imageRequest(imageUrl: String): Request = GET(
+        imageUrl,
+        headersBuilder().build(), // Headers are sometimes not added for image requests for some reason
+        CacheControl
+            .Builder()
+            .maxAge(31536000.seconds)
+            .immutable()
+            .build(),
+    )
+        .newBuilder()
+        .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
+        .build()
+
+    override fun imageRequest(page: Page): Request = imageRequest(page.imageUrl!!)
 
     // ============================== Updates ==============================
 
