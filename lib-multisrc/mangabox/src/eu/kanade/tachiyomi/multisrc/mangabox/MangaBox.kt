@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.util.LruCache
 import androidx.preference.CheckBoxPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.multisrc.mangabox.imagesize.ImageSize
@@ -77,6 +78,24 @@ abstract class MangaBox :
 
     private class MangaBoxFallBackTag // Custom empty class tag to use as an identifier that the specific request is fallback-able
 
+    // We cannot use OkHttp's cache because caching requires the entire body to be exhausted first,
+    // and we only need the first 30 bytes when determining image size
+    private val imageResponseCache by lazy {
+        object : LruCache<Pair<String, String?>, Response>(256) {
+            override fun entryRemoved(
+                evicted: Boolean,
+                key: Pair<String, String?>?,
+                oldValue: Response?,
+                newValue: Response?,
+            ) {
+                if (evicted) {
+                    oldValue?.close()
+                }
+                super.entryRemoved(evicted, key, oldValue, newValue)
+            }
+        }
+    }
+
     private fun HttpUrl.getBaseUrl(): String = "${URL_PREFIX}${this.host}${
         when (this.port) {
             80, 443 -> ""
@@ -138,6 +157,14 @@ abstract class MangaBox :
         val request = chain.request()
         request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
         val url = request.url
+
+        if (mergeImages == true) {
+            // Use cached response from merging images
+            val cachedResponse = imageResponseCache.remove(url.encodedPath to url.fragment)
+            if (cachedResponse != null) {
+                return cachedResponse
+            }
+        }
 
         if (cdnSet.isEmpty()) {
             return chain.proceed(request)
@@ -439,17 +466,17 @@ abstract class MangaBox :
 
         return if (mergeImages == true) {
             coroutineScope {
-                val headers = Headers.headersOf("Range", WebpSizeGetter.RANGE)
                 val deferredSizes = imageUrls.map { url ->
                     async {
                         try {
-                            val response = client.newCall(
-                                GET(url, headers)
-                                    .newBuilder()
-                                    .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
-                                    .build(),
-                            ).awaitSuccess()
-                            WebpSizeGetter(response.body.byteStream()).get()
+                            val response = client.newCall(imageRequest(url)).awaitSuccess()
+
+                            val httpUrl = url.toHttpUrl()
+                            imageResponseCache.put(httpUrl.encodedPath to httpUrl.fragment, response)
+
+                            WebpSizeGetter(
+                                response.peekBody(WebpSizeGetter.BYTES).byteStream(),
+                            ).get()
                         } catch (_: Exception) {
                             null
                         }
@@ -503,13 +530,15 @@ abstract class MangaBox :
 
     override suspend fun getPageList(chapter: SChapter): List<Page> = parsePageList(pageListResponse(chapter))
 
-    override fun imageRequest(page: Page): Request = GET(
-        page.imageUrl!!,
+    open fun imageRequest(imageUrl: String): Request = GET(
+        imageUrl,
         headersBuilder().build(), // Headers are sometimes not added for image requests for some reason
     )
         .newBuilder()
         .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
         .build()
+
+    override fun imageRequest(page: Page): Request = imageRequest(page.imageUrl!!)
 
     // ============================== Updates ==============================
 
