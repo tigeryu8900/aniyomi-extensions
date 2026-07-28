@@ -380,19 +380,27 @@ abstract class MangaBox :
     // ============================= Chapters ==============================
 
     open suspend fun parseChapterList(manga: SManga): List<SChapter> {
-        val slug = getMangaUrl(manga).toHttpUrl().pathSegments.last()
+        val slug = manga.url.substringAfterLast('/')
         val response = client.get("${apiChapterListUrl.replace("__SLUG__", slug)}?limit=-1")
-        val apiResult = response.parseAs<ApiResponse>()
+        val apiResult = runCatching {
+            response.parseAs<ApiResponse>()
+        }.getOrElse { return emptyList() }
 
-        return apiResult.data.chapters.map { apiChapter ->
+        if (!apiResult.success) return emptyList()
+
+        return apiResult.data?.chapters.orEmpty().mapNotNull { apiChapter ->
+            val chapterSlug = apiChapter.chapterSlug ?: return@mapNotNull null
+
             SChapter.create().apply {
-                name = apiChapter.chapterName
+                name = apiChapter.chapterName ?: "Chapter"
                 url = apiChapterPageUrl
                     .replace("__MANGA__", slug)
-                    .replace("__CHAPTER__", apiChapter.chapterSlug)
-                chapter_number = apiChapter.chapterNum
+                    .replace("__CHAPTER__", chapterSlug)
+                chapter_number = apiChapter.chapterNum ?: 0f
                 scanlator = baseUrl.replace("https://", "")
-                date_upload = Instant.parseOrNull(apiChapter.updatedAt)?.toEpochMilliseconds() ?: 0L
+                date_upload = apiChapter.updatedAt
+                    ?.let { Instant.parseOrNull(it)?.toEpochMilliseconds() }
+                    ?: 0L
             }
         }
     }
