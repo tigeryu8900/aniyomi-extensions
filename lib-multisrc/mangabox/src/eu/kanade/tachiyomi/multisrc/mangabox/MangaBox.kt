@@ -22,7 +22,6 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.util.asJsoup
 import keiyoushi.network.get
-import keiyoushi.network.rateLimit
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
@@ -45,7 +44,6 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.StampedLock
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
