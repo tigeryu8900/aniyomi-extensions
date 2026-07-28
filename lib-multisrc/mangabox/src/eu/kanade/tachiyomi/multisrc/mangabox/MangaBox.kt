@@ -1,11 +1,12 @@
 package eu.kanade.tachiyomi.multisrc.mangabox
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.util.LruCache
+import android.widget.Toast
 import androidx.preference.CheckBoxPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.multisrc.mangabox.imagesize.ImageSize
@@ -28,7 +29,7 @@ import keiyoushi.utils.parseAs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonElement
-import okhttp3.CacheControl
+import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -42,9 +43,8 @@ import okio.Buffer
 import okio.IOException
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.StampedLock
-import kotlin.time.Duration.Companion.seconds
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import kotlin.time.Instant
 
 abstract class MangaBox :
@@ -54,12 +54,6 @@ abstract class MangaBox :
     override fun OkHttpClient.Builder.configureClient(): OkHttpClient.Builder = apply {
         addInterceptor(::mergeImagesInterceptor)
         addInterceptor(::useAltCdnInterceptor)
-//        addInterceptor(::retry429Interceptor)
-//        rateLimit(
-//            permits = 5,
-//            period = 1.seconds,
-//            interval = 200.milliseconds,
-//        ) { it.encodedPath.endsWith(".webp") }
     }
 
     private fun SharedPreferences.getMergeImagesPref(): Boolean = getBoolean(PREF_MERGE_IMAGES, false)
@@ -93,19 +87,6 @@ abstract class MangaBox :
             else -> ":${this.port}"
         }
     }"
-
-    // We cannot use OkHttp's cache because caching requires the entire body to be exhausted first,
-    // and we only need the first 30 bytes when determining image size
-    private val imageResponseCache by lazy {
-        object : LruCache<Pair<String, String?>, Response>(256) {
-            override fun entryRemoved(evicted: Boolean, key: Pair<String, String?>?, oldValue: Response?, newValue: Response?) {
-                if (evicted) {
-                    oldValue?.close()
-                }
-                super.entryRemoved(evicted, key, oldValue, newValue)
-            }
-        }
-    }
 
     private fun mergeImagesInterceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -162,14 +143,6 @@ abstract class MangaBox :
         request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
         val url = request.url
 
-//        if (mergeImages == true) {
-//            // Use cached response from merging images
-//            val cachedResponse = imageResponseCache.remove(url.encodedPath to url.fragment)
-//            if (cachedResponse != null) {
-//                return cachedResponse
-//            }
-//        }
-
         if (cdnSet.isEmpty()) {
             return chain.proceed(request)
         }
@@ -218,37 +191,6 @@ abstract class MangaBox :
 
         // If all CDNs fail, throw an error
         throw IOException("All CDN attempts failed.")
-    }
-
-    private val cdnRequestLocks = ConcurrentHashMap<String, StampedLock>()
-
-    private fun retry429Interceptor(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
-        val sl = cdnRequestLocks.getOrPut(request.url.getBaseUrl()) { StampedLock() }
-        var stamp = sl.readLock()
-        try {
-            var response = chain.proceed(request)
-            if (response.code == 429) {
-                response.close()
-
-                // Block all requests by converting to write lock
-                val ws = sl.tryConvertToWriteLock(stamp)
-                if (ws != 0L) {
-                    stamp = ws
-                } else {
-                    sl.unlockRead(stamp)
-                    stamp = sl.writeLock()
-                }
-                Thread.sleep(5000)
-
-                // Retry while holding write lock to minimize chances of another 429
-                response = chain.proceed(request)
-            }
-            return response
-        } finally {
-            sl.unlock(stamp)
-        }
     }
 
     open val popularUrlPath = "manga-list/hot-manga?page="
@@ -497,30 +439,17 @@ abstract class MangaBox :
 
         return if (mergeImages == true) {
             coroutineScope {
+                val headers = Headers.headersOf("Range", WebpSizeGetter.RANGE)
                 val deferredSizes = imageUrls.map { url ->
                     async {
                         try {
-//                            val response = client.newCall(imageRequest(url)).awaitSuccess()
-                            val request = imageRequest(url)
                             val response = client.newCall(
-                                request
+                                GET(url, headers)
                                     .newBuilder()
-                                    .headers(
-                                        request
-                                            .headers
-                                            .newBuilder()
-                                            .set("Range", WebpSizeGetter.RANGE)
-                                            .build(),
-                                    )
+                                    .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
                                     .build(),
                             ).awaitSuccess()
-//                            val result = WebpSizeGetter(response.peekBody(WebpSizeGetter.BYTES).byteStream()).get()
-                            val result = WebpSizeGetter(response.body.byteStream()).get()
-
-//                            val httpUrl = url.toHttpUrl()
-//                            imageResponseCache.put(httpUrl.encodedPath to httpUrl.fragment, response)
-
-                            result
+                            WebpSizeGetter(response.body.byteStream()).get()
                         } catch (_: Exception) {
                             null
                         }
@@ -531,6 +460,13 @@ abstract class MangaBox :
 
                 for ((url, deferredSize) in imageUrls.zip(deferredSizes)) {
                     val size = deferredSize.await()
+                    if (size == null) {
+                        Toast.makeText(
+                            Injekt.get<Application>(),
+                            "Failed to get image size for $url",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                     val prev = imageList.lastOrNull()
                     val prevSize = prev?.size
                     if (
@@ -574,32 +510,13 @@ abstract class MangaBox :
 
     override suspend fun getPageList(chapter: SChapter): List<Page> = parsePageList(pageListResponse(chapter))
 
-    open fun Request.Builder.configureImageRequest(): Request.Builder = apply {
-        tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
-        headers(headersBuilder().build())
-        cacheControl(
-            CacheControl
-                .Builder()
-                .maxAge(31536000.seconds)
-                .immutable()
-                .build(),
-        )
-    }
-
-    open fun imageRequest(imageUrl: String): Request = GET(
-        imageUrl,
+    override fun imageRequest(page: Page): Request = GET(
+        page.imageUrl!!,
         headersBuilder().build(), // Headers are sometimes not added for image requests for some reason
-        CacheControl
-            .Builder()
-            .maxAge(31536000.seconds)
-            .immutable()
-            .build(),
     )
         .newBuilder()
         .tag(MangaBoxFallBackTag::class.java, MangaBoxFallBackTag())
         .build()
-
-    override fun imageRequest(page: Page): Request = imageRequest(page.imageUrl!!)
 
     // ============================== Updates ==============================
 
