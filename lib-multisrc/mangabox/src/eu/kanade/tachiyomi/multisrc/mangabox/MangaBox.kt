@@ -87,7 +87,7 @@ abstract class MangaBox :
         }
     }"
 
-    private fun mergeImagesInterceptor(chain: Interceptor.Chain): Response {
+    protected fun mergeImagesInterceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url
 
@@ -137,7 +137,7 @@ abstract class MangaBox :
         }
     }
 
-    private fun useAltCdnInterceptor(chain: Interceptor.Chain): Response {
+    protected fun useAltCdnInterceptor(chain: Interceptor.Chain): Response {
         val request = chain.request()
         request.tag(MangaBoxFallBackTag::class.java) ?: return chain.proceed(request)
         val url = request.url

@@ -4,7 +4,6 @@ import eu.kanade.tachiyomi.multisrc.mangabox.MangaBox
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import keiyoushi.annotation.Source
-import keiyoushi.network.get
 import keiyoushi.network.rateLimit
 import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -47,6 +46,8 @@ abstract class Mangakakalot : MangaBox() {
     }
 
     override fun OkHttpClient.Builder.configureClient(): OkHttpClient.Builder = apply {
+        addInterceptor(::mergeImagesInterceptor)
+        addInterceptor(::useAltCdnInterceptor)
         dispatcher(imageHeavyDispatcher)
         connectTimeout(30.seconds)
         readTimeout(60.seconds)
