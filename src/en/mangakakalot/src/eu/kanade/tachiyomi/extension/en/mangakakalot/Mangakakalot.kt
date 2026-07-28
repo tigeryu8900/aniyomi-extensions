@@ -11,7 +11,6 @@ import keiyoushi.utils.tryParse
 import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
-import okhttp3.Response
 import org.jsoup.nodes.Document
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -96,10 +95,10 @@ abstract class Mangakakalot : MangaBox() {
      * Chapter List
      * ================================ */
 
-    override suspend fun chapterListResponse(manga: SManga): Response {
+    override suspend fun parseChapterList(manga: SManga): List<SChapter> {
         val currentSlug = manga.url.substringAfterLast("/")
         val isIdSlug = currentSlug.matches(idSlugRegex)
-        val apiSlug = if (isIdSlug) {
+        val mangaSlug = if (isIdSlug) {
             val cleanSlug = titleToSlug(manga.title)
             manga.url = "/manga/$cleanSlug"
             cleanSlug
@@ -107,15 +106,8 @@ abstract class Mangakakalot : MangaBox() {
             currentSlug
         }
 
-        val apiUrl = "$baseUrl/api/manga/$apiSlug/chapters?limit=-1"
-        return client.get(apiUrl, headers)
-    }
-
-    override fun parseChapterList(response: Response): List<SChapter> {
-        val slug = response.request.url.pathSegments
-            .dropWhile { it != "manga" }
-            .getOrNull(1)
-            ?: return emptyList()
+        val apiUrl = "$baseUrl/api/manga/$mangaSlug/chapters?limit=-1"
+        val response = client.get(apiUrl, headers)
 
         val result = runCatching {
             response.parseAs<ChapterResponseDto>()
@@ -129,7 +121,7 @@ abstract class Mangakakalot : MangaBox() {
             SChapter.create().apply {
                 name = item.name ?: "Chapter"
                 chapter_number = item.num ?: 0f
-                url = "$baseUrl/manga/$slug/$chapterSlug"
+                url = "$baseUrl/manga/$mangaSlug/$chapterSlug"
                 date_upload = item.updatedAt
                     ?.let { jsonDateFormat.tryParse(it) }
                     ?: 0L
