@@ -8,6 +8,7 @@ import keiyoushi.lib.waybackmachineinterceptor.setupWaybackMachinePreferenceScre
 import keiyoushi.lib.waybackmachineinterceptor.useWaybackMachine
 import keiyoushi.network.rateLimit
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Request
 import org.jsoup.nodes.Document
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
@@ -30,6 +31,25 @@ abstract class Asmotoon : Keyoapp() {
 
     override val genreSelector: String = ".gap-3 .gap-1 a"
 
+    private fun titleToSlug(title: String): String = title
+        .lowercase(Locale.ENGLISH)
+        .replace("[^a-z0-9\\s-]".toRegex(), "")
+        .trim()
+        .replace("[\\s-]+".toRegex(), "-")
+        .trim('-')
+
+    private fun SManga.fix(): SManga = apply {
+        url = url.replace(OLD_CHAPTER_SLUG_REGEX) { titleToSlug(title) }
+    }
+
+    override fun getMangaUrl(manga: SManga): String = super.getMangaUrl(manga.fix())
+
+    override fun chapterListRequest(manga: SManga): Request = super.chapterListRequest(manga.fix())
+
+    override fun mangaDetailsRequest(manga: SManga): Request = super.mangaDetailsRequest(manga.fix())
+
+    override fun relatedMangaListRequest(manga: SManga): Request = super.relatedMangaListRequest(manga.fix())
+
     override fun mangaDetailsParse(document: Document): SManga = super.mangaDetailsParse(document).apply {
         genre = buildList {
             document.selectFirst(typeSelector)?.text()?.replaceFirstChar {
@@ -48,5 +68,9 @@ abstract class Asmotoon : Keyoapp() {
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         super.setupPreferenceScreen(screen)
         setupWaybackMachinePreferenceScreen(screen)
+    }
+
+    companion object {
+        private val OLD_CHAPTER_SLUG_REGEX = "(?<=/series/)[0-9a-f]{11}(?=/)".toRegex()
     }
 }
