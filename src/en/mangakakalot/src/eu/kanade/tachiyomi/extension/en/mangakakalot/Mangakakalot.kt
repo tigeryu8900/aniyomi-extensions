@@ -20,7 +20,6 @@ abstract class Mangakakalot : MangaBox() {
 
     private fun titleToSlug(title: String): String = title
         .lowercase(Locale.ENGLISH)
-        .replace("['']".toRegex(), "")
         .replace("[^a-z0-9\\s-]".toRegex(), "")
         .trim()
         .replace("[\\s-]+".toRegex(), "-")
