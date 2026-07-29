@@ -413,13 +413,13 @@
         "name": "Asmodeus Scans",
         "packageName": "eu.kanade.tachiyomi.extension.en.asmotoon",
         "resources": {
-          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.asmotoon-v1.4.24.apk",
+          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.asmotoon-v1.4.25.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/asmotoon/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.asmotoon-v1.4.24.jar"
+          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.asmotoon-v1.4.25.jar"
         },
         "extensionLib": "1.4",
-        "versionCode": "24",
-        "versionName": "1.4.24",
+        "versionCode": "25",
+        "versionName": "1.4.25",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
           {
