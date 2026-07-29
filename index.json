@@ -434,13 +434,13 @@
         "name": "Mangabat",
         "packageName": "eu.kanade.tachiyomi.extension.en.mangabat",
         "resources": {
-          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.mangabat-v1.6.23.apk",
+          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.mangabat-v1.6.24.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/mangabat/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.mangabat-v1.6.23.jar"
+          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.mangabat-v1.6.24.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "23",
-        "versionName": "1.6.23",
+        "versionCode": "24",
+        "versionName": "1.6.24",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
@@ -455,13 +455,13 @@
         "name": "Mangakakalot",
         "packageName": "eu.kanade.tachiyomi.extension.en.mangakakalot",
         "resources": {
-          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.mangakakalot-v1.6.24.apk",
+          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.mangakakalot-v1.6.25.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/mangakakalot/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.mangakakalot-v1.6.24.jar"
+          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.mangakakalot-v1.6.25.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "24",
-        "versionName": "1.6.24",
+        "versionCode": "25",
+        "versionName": "1.6.25",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
@@ -480,13 +480,13 @@
         "name": "Manganato",
         "packageName": "eu.kanade.tachiyomi.extension.en.manganelo",
         "resources": {
-          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.manganelo-v1.6.21.apk",
+          "apkUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@repo/apk/tachiyomi-en.manganelo-v1.6.22.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/manganelo/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.manganelo-v1.6.21.jar"
+          "jarUrl": "https://raw.githubusercontent.com/tigeryu8900/tachiyomi-extensions/repo/jar/tachiyomi-en.manganelo-v1.6.22.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "21",
-        "versionName": "1.6.21",
+        "versionCode": "22",
+        "versionName": "1.6.22",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
