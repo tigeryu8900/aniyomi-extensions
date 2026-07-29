@@ -242,40 +242,40 @@ abstract class MangaBox :
 
     // ============================== Search ===============================
 
-    open suspend fun searchMangaResponse(page: Int, query: String, filters: FilterList): Response = if (query.isNotBlank()) {
-        val url = "$baseUrl/$simpleQueryPath".toHttpUrl().newBuilder()
-            .addPathSegment(normalizeSearchQuery(query))
-            .addQueryParameter("page", page.toString())
-            .build()
+    override suspend fun getSearchMangaList(page: Int, query: String, filters: FilterList): MangasPage {
+        val response = if (query.isNotBlank()) {
+            val url = "$baseUrl/$simpleQueryPath".toHttpUrl().newBuilder()
+                .addPathSegment(normalizeSearchQuery(query))
+                .addQueryParameter("page", page.toString())
+                .build()
 
-        client.get(url)
-    } else {
-        val url = "$baseUrl/genre".toHttpUrl().newBuilder()
-        var sort: String? = null
-        var status: String? = null
-
-        filters.forEach { filter ->
-            when (filter) {
-                is SortFilter -> sort = filter.toUriPart()
-                is StatusFilter -> status = filter.toUriPart()
-                is GenreFilter -> filter.toUriPart()?.let { url.addPathSegment(it) }
-                else -> {}
-            }
-        }
-
-        val id = if (sort != null && status != null) {
-            FILTER_ID_MAP[Pair(sort, status)]
+            client.get(url)
         } else {
-            null
+            val url = "$baseUrl/genre".toHttpUrl().newBuilder()
+            var sort: String? = null
+            var status: String? = null
+
+            filters.forEach { filter ->
+                when (filter) {
+                    is SortFilter -> sort = filter.toUriPart()
+                    is StatusFilter -> status = filter.toUriPart()
+                    is GenreFilter -> filter.toUriPart()?.let { url.addPathSegment(it) }
+                    else -> {}
+                }
+            }
+
+            val id = if (sort != null && status != null) {
+                FILTER_ID_MAP[Pair(sort, status)]
+            } else {
+                null
+            }
+
+            id?.let { url.addQueryParameter("filter", it) }
+            url.addQueryParameter("page", page.toString())
+
+            client.get(url.build())
         }
 
-        id?.let { url.addQueryParameter("filter", it) }
-        url.addQueryParameter("page", page.toString())
-
-        client.get(url.build())
-    }
-
-    open fun parseSearchManga(response: Response): MangasPage {
         val document = response.asJsoup()
         val mangas = document.select(searchMangaSelector()).map { searchMangaFromElement(it) }
         val hasNextPage = searchMangaNextPageSelector().let { selector ->
@@ -283,10 +283,6 @@ abstract class MangaBox :
         }
         return MangasPage(mangas, hasNextPage)
     }
-
-    override suspend fun getSearchMangaList(page: Int, query: String, filters: FilterList): MangasPage = parseSearchManga(
-        searchMangaResponse(page, query, filters),
-    )
 
     open fun searchMangaSelector() = ".panel_story_list .story_item, div.list-truyen-item-wrap, div.list-comic-item-wrap"
 
@@ -413,8 +409,6 @@ abstract class MangaBox :
         super.getChapterUrl(chapter)
     }
 
-    open suspend fun pageListResponse(chapter: SChapter): Response = client.get(getChapterUrl(chapter))
-
     private fun extractArray(scriptContent: String, regex: Regex): List<String> {
         val match = regex.find(scriptContent)
         return match?.groupValues?.get(1)?.split(",")?.map {
@@ -422,7 +416,8 @@ abstract class MangaBox :
         } ?: emptyList()
     }
 
-    open suspend fun parsePageList(response: Response): List<Page> {
+    override suspend fun getPageList(chapter: SChapter): List<Page> {
+        val response = client.get(getChapterUrl(chapter))
         val document = response.asJsoup()
         val content = document.select("script:containsData(cdns =)").joinToString("\n") { it.data() }
         val cdns = extractArray(content, cdnsRegex) + extractArray(content, backupImageRegex)
@@ -510,8 +505,6 @@ abstract class MangaBox :
             }.toList()
         }
     }
-
-    override suspend fun getPageList(chapter: SChapter): List<Page> = parsePageList(pageListResponse(chapter))
 
     override fun imageRequest(page: Page): Request = GET(
         page.imageUrl!!,
