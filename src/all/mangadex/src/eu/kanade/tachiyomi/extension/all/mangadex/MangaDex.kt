@@ -20,6 +20,7 @@ import eu.kanade.tachiyomi.extension.all.mangadex.dto.ListDto
 import eu.kanade.tachiyomi.extension.all.mangadex.dto.MangaDataDto
 import eu.kanade.tachiyomi.extension.all.mangadex.dto.MangaDto
 import eu.kanade.tachiyomi.extension.all.mangadex.dto.MangaListDto
+import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -27,6 +28,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
+import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.annotation.Source
 import keiyoushi.network.get
 import keiyoushi.network.rateLimit
@@ -44,14 +46,82 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.util.Date
+import kotlin.collections.orEmpty
+import kotlin.collections.toMutableSet
+import kotlin.getValue
 
+/**
+ * Wrapper class for compatibility with Komikku
+ */
 @Source
-class MangaDex(
-    override val name: String,
-    override val lang: String,
-    override val baseUrl: String,
-    override val id: Long,
-) : KeiSource(),
+abstract class MangaDex :
+    HttpSource(),
+    ConfigurableSource {
+
+    private val delegate = object : MangaDexImpl() {
+        override val name: String get() = this@MangaDex.name
+        override val lang: String get() = this@MangaDex.lang
+        override val baseUrl: String get() = this@MangaDex.baseUrl
+        override val id: Long get() = this@MangaDex.id
+    }
+
+    @Suppress("unused")
+    val helper: Helper get() = delegate.helper
+
+    override fun getHomeUrl(): String = delegate.getHomeUrl()
+
+    override val supportsLatest get() = delegate.supportsLatest
+
+    override val client get() = delegate.client
+
+    override fun toString() = delegate.toString()
+
+    override suspend fun getPopularManga(page: Int): MangasPage = delegate.getPopularManga(page)
+
+    override suspend fun getLatestUpdates(page: Int): MangasPage = delegate.getLatestUpdates(page)
+
+    /**
+     * Komikku calls [latestUpdatesRequest] and [latestUpdatesParse] for MangaDex instead of [getLatestUpdates]
+     */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun latestUpdatesRequest(page: Int): Request = delegate.delegateLatestUpdatesRequest(page)
+
+    /**
+     * Komikku calls [latestUpdatesRequest] and [latestUpdatesParse] for MangaDex instead of [getLatestUpdates]
+     */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun latestUpdatesParse(response: Response): MangasPage = delegate.delegateLatestUpdatesParse(response)
+
+    override suspend fun getSearchManga(
+        page: Int,
+        query: String,
+        filters: FilterList,
+    ): MangasPage = delegate.getSearchManga(
+        page,
+        query,
+        filters,
+    )
+
+    override suspend fun getMangaUpdate(
+        manga: SManga,
+        chapters: List<SChapter>,
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SMangaUpdate = delegate.getMangaUpdate(manga, chapters, fetchDetails, fetchChapters)
+
+    override suspend fun getPageList(chapter: SChapter): List<Page> = delegate.getPageList(chapter)
+
+    override suspend fun getImageUrl(page: Page): String = delegate.getImageUrl(page)
+
+    override fun getMangaUrl(manga: SManga): String = delegate.getMangaUrl(manga)
+
+    override fun getChapterUrl(chapter: SChapter): String = delegate.getChapterUrl(chapter)
+
+    override fun setupPreferenceScreen(screen: PreferenceScreen) = delegate.setupPreferenceScreen(screen)
+}
+
+private abstract class MangaDexImpl :
+    KeiSource(),
     ConfigurableSource {
 
     private val dexLang: String
@@ -66,7 +136,7 @@ class MangaDex(
 
     private val preferences by getPreferencesLazy { sanitizeExistingUuidPrefs() }
 
-    private val helper = Helper(lang)
+    val helper = Helper(lang)
 
     override fun Headers.Builder.configureHeaders(): Headers.Builder = apply {
         val extraHeader = "Android/${Build.VERSION.RELEASE} " +
@@ -165,26 +235,28 @@ class MangaDex(
         return MangasPage(mangaList, chapterListDto.hasNextPage)
     }
 
-    override suspend fun getLatestUpdates(page: Int): MangasPage {
-        val url = Constants.API_CHAPTER_URL.toHttpUrl().newBuilder()
-            .addQueryParameter("offset", helper.getLatestChapterOffset(page))
-            .addQueryParameter("limit", Constants.LATEST_CHAPTER_LIMIT.toString())
-            .addQueryParameter("translatedLanguage[]", dexLang)
-            .addQueryParameter("order[publishAt]", "desc")
-            .addQueryParameter("includeFutureUpdates", "0")
-            .addQueryParameter("originalLanguage[]", preferences.originalLanguages)
-            .addQueryParameter("contentRating[]", preferences.contentRating)
-            .addQueryParameter(
-                "excludedGroups[]",
-                Constants.defaultBlockedGroups + preferences.blockedGroups,
-            )
-            .addQueryParameter("excludedUploaders[]", preferences.blockedUploaders)
-            .addQueryParameter("includeFuturePublishAt", "0")
-            .addQueryParameter("includeEmptyPages", "0")
-            .build()
+    private fun latestUpdatesUrl(page: Int) = Constants.API_CHAPTER_URL.toHttpUrl().newBuilder()
+        .addQueryParameter("offset", helper.getLatestChapterOffset(page))
+        .addQueryParameter("limit", Constants.LATEST_CHAPTER_LIMIT.toString())
+        .addQueryParameter("translatedLanguage[]", dexLang)
+        .addQueryParameter("order[publishAt]", "desc")
+        .addQueryParameter("includeFutureUpdates", "0")
+        .addQueryParameter("originalLanguage[]", preferences.originalLanguages)
+        .addQueryParameter("contentRating[]", preferences.contentRating)
+        .addQueryParameter(
+            "excludedGroups[]",
+            Constants.defaultBlockedGroups + preferences.blockedGroups,
+        )
+        .addQueryParameter("excludedUploaders[]", preferences.blockedUploaders)
+        .addQueryParameter("includeFuturePublishAt", "0")
+        .addQueryParameter("includeEmptyPages", "0")
+        .build()
 
-        return parseLatestUpdates(client.get(url, headers, CacheControl.FORCE_NETWORK))
-    }
+    fun delegateLatestUpdatesRequest(page: Int): Request = GET(latestUpdatesUrl(page), headers, CacheControl.FORCE_NETWORK)
+
+    fun delegateLatestUpdatesParse(response: Response): MangasPage = runBlocking { parseLatestUpdates(response) }
+
+    override suspend fun getLatestUpdates(page: Int): MangasPage = parseLatestUpdates(client.get(latestUpdatesUrl(page), headers, CacheControl.FORCE_NETWORK))
 
     // Search manga section
 
@@ -212,7 +284,7 @@ class MangaDex(
                     ),
                     cacheControl = CacheControl.FORCE_NETWORK,
                 )
-                .let { parseSearchMangaList(it, page, filters) }
+                .let { parseMangasPage(it) }
 
         query.startsWith(Constants.PREFIX_USER_SEARCH) ->
             client
@@ -245,7 +317,7 @@ class MangaDex(
                     ),
                     cacheControl = CacheControl.FORCE_NETWORK,
                 )
-                .let { parseSearchMangaList(it, page, filters) }
+                .let { parseMangasPage(it) }
     }
 
     private suspend fun getMangaIdFromChapterId(id: String): String = client.get(
@@ -412,7 +484,9 @@ class MangaDex(
         }
 
         val response = client.get(
-            url = (Constants.API_URL + url.encodedPath).toHttpUrl().newBuilder()
+            url = "${Constants.API_URL}/manga/${url.pathSegments[1]}"
+                .toHttpUrl()
+                .newBuilder()
                 .addQueryParameter("includes[]", Constants.COVER_ART)
                 .addQueryParameter("includes[]", Constants.AUTHOR)
                 .addQueryParameter("includes[]", Constants.ARTIST)
