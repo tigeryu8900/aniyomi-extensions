@@ -116,20 +116,24 @@ class ChapterDto(
 ) {
     fun toSChapter(mangaUrl: String, langCode: String): SChapter = SChapter.create().apply {
         url = "$mangaUrl/$id-chapter-${number.toString().removeSuffix(".0")}-$langCode"
-        chapter_number = number
-        name = if (this@ChapterDto.name.isNullOrBlank()) {
-            "Ch. ${number.toString().removeSuffix(".0")}"
-        } else if (this@ChapterDto.name.contains(chapterRegex)) {
-            this@ChapterDto.name
+        if (this@ChapterDto.name.isNullOrBlank()) {
+            chapter_number = number
+            name = "Ch. ${number.toString().removeSuffix(".0")}"
         } else {
-            "Ch. ${number.toString().removeSuffix(".0")} - ${this@ChapterDto.name}"
+            chapterRegex.find(this@ChapterDto.name)?.value?.toFloatOrNull()?.also {
+                chapter_number = it
+                name = this@ChapterDto.name
+            } ?: {
+                chapter_number = number
+                name = "Ch. ${number.toString().removeSuffix(".0")} - ${this@ChapterDto.name}"
+            }
         }
         scanlator = type ?: "Unknown"
         date_upload = createdAt?.times(1000L) ?: 0L
     }
 
     companion object {
-        private val chapterRegex = """\bch(?:\.|apter)?\s*\d""".toRegex(RegexOption.IGNORE_CASE)
+        private val chapterRegex = """(?<=\bch(?:\.|apter)?\s?)\d+(?:\.\d+)?""".toRegex(RegexOption.IGNORE_CASE)
     }
 }
 
