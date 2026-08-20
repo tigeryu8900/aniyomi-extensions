@@ -55,8 +55,8 @@ def validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser):
         args.multisrc = multisrc_theme
 
         if (
-            'libVersion = "1.4"'
-            in (multisrc_dir / multisrc_theme / "build.gradle.kts").read_text()
+                'libVersion = "1.4"'
+                in (multisrc_dir / multisrc_theme / "build.gradle.kts").read_text()
         ):
             args.is_keisource = False
 
@@ -138,6 +138,7 @@ def write_keisource_source(f, classname: str) -> None:
         "\toverride suspend fun getSearchMangaList(page: Int, query: String, filters: FilterList): MangasPage =\n"
         "\t\tthrow UnsupportedOperationException()\n\n"
     )
+
     f.write("\toverride suspend fun getMangaByUrl(url: HttpUrl): SManga? = null\n\n")
 
     f.write("\toverride suspend fun fetchMangaUpdate(\n")
@@ -154,10 +155,10 @@ def write_keisource_source(f, classname: str) -> None:
 
 
 def write_source_file(
-    args: argparse.Namespace,
-    ext_package_dir: Path,
-    ext_dir_lang: str,
-    ext_dir_name: str,
+        args: argparse.Namespace,
+        ext_package_dir: Path,
+        ext_dir_lang: str,
+        ext_dir_name: str,
 ) -> None:
     classname = get_ext_classname(args.extname)
 
@@ -237,14 +238,14 @@ if __name__ == "__main__":
     write_gradle_file(args, ext_dir)
 
     ext_package_dir = (
-        ext_dir
-        / "src"
-        / "eu"
-        / "kanade"
-        / "tachiyomi"
-        / "extension"
-        / ext_dir_lang
-        / ext_dir_name
+            ext_dir
+            / "src"
+            / "eu"
+            / "kanade"
+            / "tachiyomi"
+            / "extension"
+            / ext_dir_lang
+            / ext_dir_name
     )
     ext_package_dir.mkdir(parents=True)
     print(f"Created extension package directory: '{ext_package_dir}'")
