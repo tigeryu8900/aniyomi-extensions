@@ -392,9 +392,9 @@
         "name": "MangaFire",
         "packageName": "eu.kanade.tachiyomi.extension.all.mangafire",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/e585507/tachiyomi-all.mangafire-v1.6.30.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/7c91f0e/tachiyomi-all.mangafire-v1.6.30.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/all/mangafire/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/e585507/tachiyomi-all.mangafire-v1.6.30.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/7c91f0e/tachiyomi-all.mangafire-v1.6.30.jar"
         },
         "extensionLib": "1.6",
         "versionCode": "30",
