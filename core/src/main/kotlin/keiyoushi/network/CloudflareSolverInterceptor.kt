@@ -54,7 +54,6 @@ internal class CloudflareSolverInterceptor(
                     userAgentString = request.header("User-Agent")
                 }
 
-                val isFirstRequest = AtomicBoolean(true)
                 val challengeCompleted = AtomicBoolean(false)
 
                 view.webViewClient = object : WebViewClient() {
@@ -66,27 +65,18 @@ internal class CloudflareSolverInterceptor(
                             ?: return super.shouldInterceptRequest(view, webResourceRequest)
 
                         when (webResourceRequest.method) {
-                            "GET" if requestUrl.host == request.url.host &&
-                                requestUrl.encodedPath == request.url.encodedPath -> {
-                                if (isFirstRequest.getAndSet(false)) {
-                                    response.injectJS(OUTER_SCRIPT).toWebResourceResponse()
-                                } else {
-                                    super.shouldInterceptRequest(view, webResourceRequest)
-                                }
-                            }
-
-                            "POST" if requestUrl.host == request.url.host &&
-                                requestUrl.encodedPath == request.url.encodedPath -> {
-                                challengeCompleted.set(true)
-                                super.shouldInterceptRequest(view, webResourceRequest)
-                            }
-
                             "GET" if requestUrl.toString().startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/") -> {
                                 client
                                     .newCall(webResourceRequest.toRequest())
                                     .execute()
                                     .injectJS(INNER_SCRIPT)
                                     .toWebResourceResponse()
+                            }
+
+                            "POST" if requestUrl.host == request.url.host &&
+                                requestUrl.encodedPath == request.url.encodedPath -> {
+                                challengeCompleted.set(true)
+                                super.shouldInterceptRequest(view, webResourceRequest)
                             }
 
                             else -> super.shouldInterceptRequest(view, webResourceRequest)
@@ -121,7 +111,13 @@ internal class CloudflareSolverInterceptor(
                     }
                 }*/
 
-                view.loadUrl(request.url.toString(), request.headers.toMap())
+                view.loadDataWithBaseURL(
+                    request.url.toString(),
+                    response.body.string().injectJS(OUTER_SCRIPT),
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
             }
 
             latch.await(30, TimeUnit.SECONDS)
@@ -152,17 +148,28 @@ internal class CloudflareSolverInterceptor(
     )
 
     /**
-     * Returns a new response with the injected JavaScript code.
+     * Returns a new HTML string with the injected JavaScript code.
      *
      * The injected script element is prepended to the HTML, and all `Error` classes are patched so that the injected code doesn't appear in
      * stack traces and that the line numbers correspond to the original unpatched HTML.
      */
+    private fun String.injectJS(js: String, nonce: String = ""): String =
+        "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;$ERROR_PATCHER_SCRIPT;errorPatcher(${
+            BASE_LINE_COUNT + js.count { it == '\n' }
+        });})();</script>\n$this"
+
+    /**
+     * Returns a new response with the injected JavaScript code.
+     */
     private fun Response.injectJS(js: String): Response = newBuilder().body(
         body.contentType().let { contentType ->
-            val nonce = header("Content-Security-Policy")?.let { nonceRegex.find(it) }?.value.orEmpty()
-            val lines = BASE_LINE_COUNT + js.count { it == '\n' }
-
-            "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;$ERROR_PATCHER_SCRIPT;errorPatcher($lines);})();</script>\n${body.string()}".toResponseBody(contentType)
+            body
+                .string()
+                .injectJS(
+                    js,
+                    header("Content-Security-Policy")?.let { nonceRegex.find(it) }?.value.orEmpty(),
+                )
+                .toResponseBody(contentType)
         },
     ).build()
 
