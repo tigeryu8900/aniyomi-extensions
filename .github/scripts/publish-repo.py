@@ -248,7 +248,7 @@ def create_release(tag: str):
         "--title",
         f"Repository Update {tag}",
         "--notes",
-        f"Automated update from tigeryu8900/tyachiyomi-extensions@{current_sha}",
+        f"Automated update from tigeryu8900/tachiyomi-extensions@{current_sha}",
     )
 
 
