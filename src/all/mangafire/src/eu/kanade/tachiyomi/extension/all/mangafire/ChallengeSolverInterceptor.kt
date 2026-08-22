@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import okhttp3.Interceptor
 import okhttp3.Response
 import uy.kohesive.injekt.injectLazy
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.getValue
@@ -54,7 +55,7 @@ class ChallengeSolverInterceptor(
         response.close()
 
         if (!doSolve()) {
-            throw Exception("Shape-selecting captcha detected. Open in WebView to solve or turn on the setting to solve automatically.")
+            throw IOException("Shape-selecting captcha detected. Open in WebView to solve or turn on the setting to solve automatically.")
         }
 
         // We are solving the challenge in a WebView instead of directly in Kotlin because the solver depends on OpenCV, which is >100 MB
@@ -117,7 +118,7 @@ class ChallengeSolverInterceptor(
         handler.post { webView?.destroy() }
 
         if (!jsInterface.solved) {
-            throw Exception("Failed to solve shape-selecting captcha. Open in WebView to solve manually.")
+            throw IOException("Failed to solve shape-selecting captcha. Open in WebView to solve manually.")
         }
 
         return chain.proceed(request)
