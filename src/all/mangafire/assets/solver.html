@@ -846,7 +846,20 @@ async function verify(captcha_id, dots) {
   return response.json();
 }
 
-async function solve(abortIfDone) {
+let complete = false;
+
+function setComplete() {
+  complete = true;
+  return true;
+}
+
+function abortIfDone() {
+  if (complete) {
+    throw "Aborted";
+  }
+}
+
+async function solve() {
   abortIfDone();
 
   const {captcha_id, count, image_base64, thumb_base64} = await generate();
@@ -875,32 +888,15 @@ async function solve(abortIfDone) {
   }
 }
 
-let complete = false;
-
-function setComplete() {
-  complete = true;
-  return true;
-}
-
-function abortIfDone() {
-  if (complete) {
-    throw "Aborted";
-  }
-}
-
-function task() {
-  return solve(abortIfDone);
-}
-
 (async () => {
   try {
     for (let i = 0; i < 10; i++) {
-      if (await Promise.any(Array.from({length: 10}, task)).then(setComplete, () => false)) {
+      if (await Promise.any(Array.from({length: 10}, solve)).then(setComplete, () => false)) {
         return;
       }
     }
   } finally {
-    latch.countDown();
+    jsInterface.resolve(complete);
   }
 })();
         </script>
