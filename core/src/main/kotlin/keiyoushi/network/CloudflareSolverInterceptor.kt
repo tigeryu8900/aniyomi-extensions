@@ -154,10 +154,9 @@ internal class CloudflareSolverInterceptor(
      * The injected script element is prepended to the HTML, and all `Error` classes are patched so that the injected code doesn't appear in
      * stack traces and that the line numbers correspond to the original unpatched HTML.
      */
-    private fun String.injectJS(js: String, nonce: String = ""): String =
-        "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;$ERROR_PATCHER_SCRIPT;errorPatcher(${
-            BASE_LINE_COUNT + js.count { it == '\n' }
-        });})();</script>\n$this"
+    private fun String.injectJS(js: String, nonce: String = ""): String = "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;$ERROR_PATCHER_SCRIPT;errorPatcher(${
+        BASE_LINE_COUNT + js.count { it == '\n' }
+    });})();</script>\n$this"
 
     /**
      * Returns a new response with the injected JavaScript code.
