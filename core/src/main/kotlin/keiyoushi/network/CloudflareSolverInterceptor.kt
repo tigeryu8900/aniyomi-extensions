@@ -1,14 +1,9 @@
 package keiyoushi.network
 
-import android.annotation.SuppressLint
-import android.app.Application
-import android.os.Handler
-import android.os.Looper
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Toast
+import eu.kanade.tachiyomi.network.NetworkHelper
+import keiyoushi.utils.runWebViewBlocking
 import okhttp3.Headers.Companion.toHeaders
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
@@ -16,20 +11,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import uy.kohesive.injekt.injectLazy
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.text.ifEmpty
 
 internal class CloudflareSolverInterceptor(
-    private val client: OkHttpClient,
     private val cloudflareInterceptor: Interceptor,
 ) : Interceptor {
-    private val application by injectLazy<Application>()
-
-    @SuppressLint("SetJavaScriptEnabled")
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val response = chain.proceed(request)
@@ -38,94 +27,42 @@ internal class CloudflareSolverInterceptor(
             return response
         }
 
-        val handler = Handler(Looper.getMainLooper())
-        val latch = CountDownLatch(1)
-        var webView: WebView? = null
+        runWebViewBlocking(chain.call()) {
+            request.header("User-Agent")?.let { userAgent = it }
 
-        handler.post {
-            Toast.makeText(application, "Attempting to solve Cloudflare challenge", Toast.LENGTH_SHORT).show()
+            var challengeCompleted = false
 
-            val view = WebView(application)
-            webView = view
+            interceptRequest {
+                val requestUrl = it.url?.toString()?.toHttpUrlOrNull() ?: return@interceptRequest null
 
-            with(view.settings) {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                loadWithOverviewMode = true
-                useWideViewPort = true
-                blockNetworkImage = false
-                userAgentString = request.header("User-Agent")
-            }
-
-            val challengeCompleted = AtomicBoolean(false)
-
-            view.webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(
-                    view: WebView,
-                    webResourceRequest: WebResourceRequest,
-                ): WebResourceResponse? = run {
-                    val requestUrl = webResourceRequest.url?.toString()?.toHttpUrlOrNull()
-                        ?: return super.shouldInterceptRequest(view, webResourceRequest)
-
-                    when (webResourceRequest.method) {
-                        "GET" if requestUrl.toString().startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/") -> {
-                            client
-                                .newCall(webResourceRequest.toRequest())
-                                .execute()
-                                .injectJS(INNER_SCRIPT)
-                                .toWebResourceResponse()
-                        }
-
-                        "POST" if requestUrl.host == request.url.host &&
-                            requestUrl.encodedPath == request.url.encodedPath -> {
-                            challengeCompleted.set(true)
-                            super.shouldInterceptRequest(view, webResourceRequest)
-                        }
-
-                        else -> super.shouldInterceptRequest(view, webResourceRequest)
+                when (it.method) {
+                    "GET" if requestUrl.toString().startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/") -> {
+                        client
+                            .newCall(it.toRequest())
+                            .execute()
+                            .injectJS(INNER_SCRIPT)
+                            .toWebResourceResponse()
                     }
-                }
 
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    if (challengeCompleted.get()) {
-                        latch.countDown()
+                    "POST" if requestUrl.host == request.url.host &&
+                        requestUrl.encodedPath == request.url.encodedPath -> {
+                        challengeCompleted = true
+                        null
                     }
-                    super.onPageFinished(view, url)
+
+                    else -> null
                 }
             }
 
-            // Somewhat useful if you need to debug WebView issues. Don't delete.
-            /*view.webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                    if (consoleMessage == null) {
-                        return false
-                    }
-                    val logContent = "wv: ${consoleMessage.message()} (${consoleMessage.sourceId()}, line ${consoleMessage.lineNumber()})"
-                    when (consoleMessage.messageLevel()) {
-                        ConsoleMessage.MessageLevel.DEBUG -> Log.d("cloudflare", logContent)
-                        ConsoleMessage.MessageLevel.ERROR -> Log.e("cloudflare", logContent)
-                        ConsoleMessage.MessageLevel.LOG -> Log.i("cloudflare", logContent)
-                        ConsoleMessage.MessageLevel.TIP -> Log.i("cloudflare", logContent)
-                        ConsoleMessage.MessageLevel.WARNING -> Log.w("cloudflare", logContent)
-                        else -> Log.d("cloudflare", logContent)
-                    }
-
-                    return true
+            onPageFinished {
+                if (challengeCompleted) {
+                    resolve(Unit)
                 }
-            }*/
+            }
 
-            view.loadDataWithBaseURL(
-                request.url.toString(),
-                response.body.string().injectJS(OUTER_SCRIPT),
-                "text/html",
-                "UTF-8",
-                null,
-            )
+            loadData(request.url.toString(), response.body.string().injectJS(OUTER_SCRIPT))
         }
 
-        latch.await(30, TimeUnit.SECONDS)
-        handler.post { webView?.destroy() }
         response.close()
 
         // Use the original Cloudflare interceptor in case the solver failed
@@ -154,9 +91,9 @@ internal class CloudflareSolverInterceptor(
      * The injected script element is prepended to the HTML, and all `Error` classes are patched so that the injected code doesn't appear in
      * stack traces and that the line numbers correspond to the original unpatched HTML.
      */
-    private fun String.injectJS(js: String, nonce: String = ""): String = "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;$ERROR_PATCHER_SCRIPT;errorPatcher(${
+    private fun String.injectJS(js: String, nonce: String = ""): String = "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;})();($ERROR_PATCHER_SCRIPT)(${
         BASE_LINE_COUNT + js.count { it == '\n' }
-    });})();</script>\n$this"
+    });</script>\n$this"
 
     /**
      * Returns a new response with the injected JavaScript code.
@@ -174,6 +111,12 @@ internal class CloudflareSolverInterceptor(
     ).build()
 
     companion object {
+        private val client: OkHttpClient by lazy {
+            Injekt.get<NetworkHelper>().client.newBuilder().apply {
+                interceptors().removeAll { it.javaClass.simpleName == "CloudflareInterceptor" }
+            }.build()
+        }
+
         private val nonceRegex = """(?<=nonce-)\w+""".toRegex()
 
         /**

@@ -1,44 +1,23 @@
 package eu.kanade.tachiyomi.extension.all.mangafire
 
 import android.annotation.SuppressLint
-import android.app.Application
-import android.os.Handler
-import android.os.Looper
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
-import android.widget.Toast
 import keiyoushi.utils.parseAs
+import keiyoushi.utils.runWebViewBlocking
 import kotlinx.serialization.Serializable
 import okhttp3.Interceptor
 import okhttp3.Response
-import uy.kohesive.injekt.injectLazy
 import java.io.IOException
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.getValue
 
 class ChallengeSolverInterceptor(
     private val doSolve: () -> Boolean,
 ) : Interceptor {
-    private val application by injectLazy<Application>()
     private val html by lazy { javaClass.getResource("/assets/solver.html")!!.readText() }
 
     @Serializable
     private data class ErrorResponse(
         val error: String?,
     )
-
-    private class JsInterface {
-        val latch = CountDownLatch(1)
-        var solved: Boolean = false
-
-        @Suppress("unused")
-        @JavascriptInterface
-        fun resolve(solved: Boolean) {
-            this.solved = solved
-            latch.countDown()
-        }
-    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -62,62 +41,12 @@ class ChallengeSolverInterceptor(
         // as a Kotlin dependency. Also, the OpenCV binaries would be in the storage of the extension app, making them inaccessible to the
         // reader app.
         // Using a WebView instead makes it possible to dynamically request OpenCV.js, keeping the app size small.
-
-        val handler = Handler(Looper.getMainLooper())
-        val jsInterface = JsInterface()
-        var webView: WebView? = null
-
-        handler.post {
-            Toast.makeText(application, "Attempting to solve MangaFire challenge", Toast.LENGTH_SHORT).show()
-
-            val view = WebView(application)
-            webView = view
-
-            with(view.settings) {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                loadWithOverviewMode = true
-                useWideViewPort = true
-                blockNetworkImage = false
-                userAgentString = request.header("User-Agent")
-            }
-
-            // Somewhat useful if you need to debug WebView issues. Don't delete.
-            /*view.webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                    if (consoleMessage == null) {
-                        return false
-                    }
-                    val logContent = "wv: ${consoleMessage.message()} (${consoleMessage.sourceId()}, line ${consoleMessage.lineNumber()})"
-                    when (consoleMessage.messageLevel()) {
-                        ConsoleMessage.MessageLevel.DEBUG -> Log.d("mangafire", logContent)
-                        ConsoleMessage.MessageLevel.ERROR -> Log.e("mangafire", logContent)
-                        ConsoleMessage.MessageLevel.LOG -> Log.i("mangafire", logContent)
-                        ConsoleMessage.MessageLevel.TIP -> Log.i("mangafire", logContent)
-                        ConsoleMessage.MessageLevel.WARNING -> Log.w("mangafire", logContent)
-                        else -> Log.d("mangafire", logContent)
-                    }
-
-                    return true
-                }
-            }*/
-
-            view.addJavascriptInterface(jsInterface, "jsInterface")
-
-            view.loadDataWithBaseURL(
-                "https://mangafire.to/@waf/solver",
-                html,
-                "text/html",
-                "UTF-8",
-                null,
-            )
+        val solved = runWebViewBlocking(chain.call()) {
+            jsBridge("bridge") { resolve(it == "true") }
+            loadData("https://mangafire.to/@waf/solver", html)
         }
 
-        jsInterface.latch.await(30, TimeUnit.SECONDS)
-        handler.post { webView?.destroy() }
-
-        if (!jsInterface.solved) {
+        if (!solved) {
             throw IOException("Failed to solve shape-selecting captcha. Open in WebView to solve manually.")
         }
 

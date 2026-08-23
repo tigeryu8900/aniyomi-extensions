@@ -896,7 +896,7 @@
               }
             }
           } finally {
-            jsInterface.resolve(complete);
+            bridge.post(`${complete}`);
           }
         })();
     </script>
