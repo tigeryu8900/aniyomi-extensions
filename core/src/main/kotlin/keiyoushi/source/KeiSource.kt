@@ -111,7 +111,7 @@ abstract class KeiSource : HttpSource() {
                 val cloudflareInterceptor = firstOrNull { it.javaClass.simpleName == "CloudflareInterceptor" }
                 if (cloudflareInterceptor != null) {
                     remove(cloudflareInterceptor)
-                    add(CloudflareSolverInterceptor(build(), cloudflareInterceptor))
+                    add(CloudflareSolverInterceptor(cloudflareInterceptor))
                 }
             }
 
