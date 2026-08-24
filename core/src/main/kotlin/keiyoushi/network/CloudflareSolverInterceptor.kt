@@ -46,8 +46,7 @@ internal class CloudflareSolverInterceptor(
         }
     }
 
-    private fun Interceptor.Chain.clearance() =
-        cookieJar.loadForRequest(request().url).find { it.name == "cf_clearance" }?.value
+    private fun Interceptor.Chain.clearance() = cookieJar.loadForRequest(request().url).find { it.name == "cf_clearance" }?.value
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val call = chain.call()

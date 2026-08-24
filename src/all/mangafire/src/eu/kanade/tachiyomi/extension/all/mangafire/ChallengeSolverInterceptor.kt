@@ -18,8 +18,7 @@ class ChallengeSolverInterceptor(
 
     private val lock = ReentrantReadWriteLock()
 
-    private fun Interceptor.Chain.clearance() =
-        cookieJar.loadForRequest(request().url).find { it.name == "waf_pass" }?.value
+    private fun Interceptor.Chain.clearance() = cookieJar.loadForRequest(request().url).find { it.name == "waf_pass" }?.value
 
     @Serializable
     private data class ErrorResponse(
