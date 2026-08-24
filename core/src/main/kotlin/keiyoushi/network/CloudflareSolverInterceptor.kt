@@ -41,8 +41,8 @@ internal class CloudflareSolverInterceptor(
         }
 
         operator fun get(key: String): Pair<ReentrantReadWriteLock, ReentrantReadWriteLock.ReadLock> = synchronized(data) {
-            val (lock, entryLock) = (data[key] ?: Pair(ReentrantReadWriteLock(), ReentrantReadWriteLock()).also { data.put(key, it) })
-            lock to entryLock.readLock()
+            val (lock, entryLock) = data[key] ?: (Pair(ReentrantReadWriteLock(), ReentrantReadWriteLock()).also { data.put(key, it) })
+            lock to entryLock.readLock().apply { lock() }
         }
     }
 
