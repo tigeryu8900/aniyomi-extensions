@@ -12,11 +12,11 @@
   "eu.kanade.tachiyomi.extension.all.mangafire": {
     "apk": {
       "name": "tachiyomi-all.mangafire-v1.6.31.apk",
-      "sha256": "708a48420386e218b1f004336ecf9be1608f187bdd47d7520145f470f7d9d304"
+      "sha256": "dbc799fbe18ba3c53637fbf861f6a7f077c731d610d93feff74f835ab93d0399"
     },
     "jar": {
       "name": "tachiyomi-all.mangafire-v1.6.31.jar",
-      "sha256": "e20efdde3f5913dfe79c10fcc7cb3a21484b48901467b3f8cea3f90b55281bf6"
+      "sha256": "ba9d258683bdfb59dbff39a07cae24866f554a026b8b84d5d3a67558dbead8be"
     }
   },
   "eu.kanade.tachiyomi.extension.en.artlapsa": {
