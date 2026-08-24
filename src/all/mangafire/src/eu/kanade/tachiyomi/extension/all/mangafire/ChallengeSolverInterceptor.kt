@@ -1,11 +1,16 @@
 package eu.kanade.tachiyomi.extension.all.mangafire
 
 import android.annotation.SuppressLint
+import eu.kanade.tachiyomi.network.NetworkHelper
 import keiyoushi.utils.parseAs
 import keiyoushi.utils.runWebViewBlocking
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.io.IOException
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.withLock
@@ -18,7 +23,9 @@ class ChallengeSolverInterceptor(
 
     private val lock = ReentrantReadWriteLock()
 
-    private fun Interceptor.Chain.clearance() = cookieJar.loadForRequest(request().url).find { it.name == "waf_pass" }?.value
+    private val cookieJar by lazy { Injekt.get<NetworkHelper>().client.cookieJar }
+
+    private fun clearance(url: HttpUrl) = cookieJar.loadForRequest(url).find { it.name == "waf_pass" }?.value
 
     @Serializable
     private data class ErrorResponse(
@@ -29,12 +36,18 @@ class ChallengeSolverInterceptor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val call = chain.call()
         val request = chain.request()
+        val url = request.url
 
         val oldClearance = lock.readLock().withLock {
+            // We can't just check cookies first because we might need to bypass Cloudflare
             val response = chain.proceed(request)
             if (
                 response.code != 403 ||
-                response.peekBody(Long.MAX_VALUE).byteStream().parseAs<ErrorResponse>().error != "captcha_required"
+                try {
+                    response.peekBody(Long.MAX_VALUE).byteStream().parseAs<ErrorResponse>().error != "captcha_required"
+                } catch (_: SerializationException) {
+                    true
+                }
             ) {
                 return response
             }
@@ -44,7 +57,7 @@ class ChallengeSolverInterceptor(
                 throw IOException("Shape-selecting captcha detected. Open in WebView to solve manually or turn on the setting to solve automatically.")
             }
 
-            chain.clearance()
+            clearance(url)
         }
 
         if (call.isCanceled()) {
@@ -60,14 +73,14 @@ class ChallengeSolverInterceptor(
                 throw IOException("Canceled")
             }
 
-            if (chain.clearance().let { it != oldClearance && !it.isNullOrBlank() }) {
+            if (clearance(url).let { it != oldClearance && !it.isNullOrBlank() }) {
                 // Captcha solved in another call, skip
                 return@withLock true
             }
 
             runWebViewBlocking(call) {
                 jsBridge("bridge") { resolve(it == "true") }
-                loadData("https://mangafire.to/@waf/solver", html)
+                loadData("https://${request.url.host}/@waf/solver", html)
             }
         }
 

@@ -5,6 +5,7 @@ import android.webkit.WebResourceResponse
 import eu.kanade.tachiyomi.network.NetworkHelper
 import keiyoushi.utils.runWebViewBlocking
 import okhttp3.Headers.Companion.toHeaders
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -40,21 +41,31 @@ internal class CloudflareSolverInterceptor(
             }
         }
 
-        operator fun get(key: String): Pair<ReentrantReadWriteLock, ReentrantReadWriteLock.ReadLock> = synchronized(data) {
-            val (lock, entryLock) = data[key] ?: (Pair(ReentrantReadWriteLock(), ReentrantReadWriteLock()).also { data.put(key, it) })
-            lock to entryLock.readLock().apply { lock() }
+        inline fun withLock(host: String, block: (ReentrantReadWriteLock) -> Unit) {
+            val (lock, entryLock) = synchronized(data) {
+                var entry = data[host]
+                if (entry == null) {
+                    entry = ReentrantReadWriteLock() to ReentrantReadWriteLock()
+                    data.put(host, entry)
+                }
+                entry.first to entry.second.readLock().apply { lock() }
+            }
+            try {
+                block(lock)
+            } finally {
+                entryLock.unlock()
+            }
         }
     }
 
-    private fun Interceptor.Chain.clearance() = cookieJar.loadForRequest(request().url).find { it.name == "cf_clearance" }?.value
+    private fun clearance(url: HttpUrl) = client.cookieJar.loadForRequest(url).find { it.name == "cf_clearance" }?.value
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val call = chain.call()
         val request = chain.request()
+        val url = request.url
 
-        // entryLock locked on get
-        val (lock, entryLock) = locks[request.url.host]
-        try {
+        locks.withLock(url.host) { lock ->
             val (response, oldClearance) = lock.readLock().withLock {
                 if (call.isCanceled()) {
                     throw IOException("Canceled")
@@ -64,27 +75,27 @@ internal class CloudflareSolverInterceptor(
                     if (header("cf-mitigated") != "challenge") {
                         return this
                     }
-                } to chain.clearance()
+                } to clearance(url)
             }
 
-            if (call.isCanceled()) {
-                throw IOException("Canceled")
-            }
-
-            lock.writeLock().withLock {
+            response.use { response ->
                 if (call.isCanceled()) {
                     throw IOException("Canceled")
                 }
 
-                if (chain.clearance().let { it != oldClearance && !it.isNullOrBlank() }) {
-                    // Cloudflare solved in another call, skip
-                    return@withLock
-                }
+                lock.writeLock().withLock {
+                    if (call.isCanceled()) {
+                        throw IOException("Canceled")
+                    }
 
-                resolveInWebView(chain, response.body)
+                    if (clearance(url).let { it != oldClearance && !it.isNullOrBlank() }) {
+                        // Cloudflare solved in another call, skip
+                        return@withLock
+                    }
+
+                    resolveInWebView(chain, response.body)
+                }
             }
-        } finally {
-            entryLock.unlock()
         }
 
         // Use the original Cloudflare interceptor in case the solver failed
@@ -93,12 +104,7 @@ internal class CloudflareSolverInterceptor(
 
     private fun resolveInWebView(chain: Interceptor.Chain, body: ResponseBody) = runWebViewBlocking(chain.call()) {
         val request = chain.request()
-
-        if (chain.cookieJar.loadForRequest(request.url).any { it.name == "cf_clearance" }) {
-            // Cloudflare solved in another call, skip
-            resolve(Unit)
-            return@runWebViewBlocking
-        }
+        val url = request.url
 
         request.header("User-Agent")?.let { userAgent = it }
 
@@ -116,8 +122,8 @@ internal class CloudflareSolverInterceptor(
                         .toWebResourceResponse()
                 }
 
-                "POST" if requestUrl.host == request.url.host &&
-                    requestUrl.encodedPath == request.url.encodedPath -> {
+                "POST" if requestUrl.host == url.host &&
+                    requestUrl.encodedPath == url.encodedPath -> {
                     challengeCompleted = true
                     null
                 }
@@ -132,7 +138,7 @@ internal class CloudflareSolverInterceptor(
             }
         }
 
-        loadData(request.url.toString(), body.string().injectJS(OUTER_SCRIPT))
+        loadData(url.toString(), body.string().injectJS(OUTER_SCRIPT))
     }
 
     private fun WebResourceRequest.toRequest(): Request = Request.Builder().apply {
