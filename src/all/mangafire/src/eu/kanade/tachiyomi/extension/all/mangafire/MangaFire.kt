@@ -27,7 +27,6 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Response
-import uy.kohesive.injekt.api.get
 
 @Source
 abstract class MangaFire :
@@ -44,7 +43,7 @@ abstract class MangaFire :
     override fun OkHttpClient.Builder.configureClient() = apply {
         rateLimit(2)
         addInterceptor(VrfSigner().interceptor())
-        addInterceptor(ChallengeSolverInterceptor { solveCaptcha })
+        addInterceptor(ChallengeSolverInterceptor({ client.cookieJar }, { solveCaptcha }))
     }
 
     override fun Headers.Builder.configureHeaders() = apply {
