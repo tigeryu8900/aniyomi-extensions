@@ -10,63 +10,130 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.io.IOException
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.withLock
 import kotlin.text.ifEmpty
 
 internal class CloudflareSolverInterceptor(
     private val cloudflareInterceptor: Interceptor,
 ) : Interceptor {
+    private val locks = object {
+        private val MAX_CAPACITY = 256
+        private val data = object : LinkedHashMap<String, Pair<ReentrantReadWriteLock, ReentrantReadWriteLock>>() {
+            override fun removeEldestEntry(
+                eldest: Map.Entry<String, Pair<ReentrantReadWriteLock, ReentrantReadWriteLock>>,
+            ): Boolean {
+                if (size > MAX_CAPACITY) {
+                    eldest.value.second.writeLock().withLock {
+                        if (size > MAX_CAPACITY) {
+                            remove(eldest.key)
+                        }
+                    }
+                }
+                return false
+            }
+        }
+
+        operator fun get(key: String): Pair<ReentrantReadWriteLock, ReentrantReadWriteLock.ReadLock> = synchronized(data) {
+            val (lock, entryLock) = (data[key] ?: Pair(ReentrantReadWriteLock(), ReentrantReadWriteLock()).also { data.put(key, it) })
+            lock to entryLock.readLock()
+        }
+    }
+
+    private fun Interceptor.Chain.clearance() =
+        cookieJar.loadForRequest(request().url).find { it.name == "cf_clearance" }?.value
+
     override fun intercept(chain: Interceptor.Chain): Response {
+        val call = chain.call()
         val request = chain.request()
-        val response = chain.proceed(request)
 
-        if (response.header("cf-mitigated") != "challenge") {
-            return response
-        }
-
-        runWebViewBlocking(chain.call()) {
-            request.header("User-Agent")?.let { userAgent = it }
-
-            var challengeCompleted = false
-
-            interceptRequest {
-                val requestUrl = it.url?.toString()?.toHttpUrlOrNull() ?: return@interceptRequest null
-
-                when (it.method) {
-                    "GET" if requestUrl.toString().startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/") -> {
-                        client
-                            .newCall(it.toRequest())
-                            .execute()
-                            .injectJS(INNER_SCRIPT)
-                            .toWebResourceResponse()
-                    }
-
-                    "POST" if requestUrl.host == request.url.host &&
-                        requestUrl.encodedPath == request.url.encodedPath -> {
-                        challengeCompleted = true
-                        null
-                    }
-
-                    else -> null
+        // entryLock locked on get
+        val (lock, entryLock) = locks[request.url.host]
+        try {
+            val (response, oldClearance) = lock.readLock().withLock {
+                if (call.isCanceled()) {
+                    throw IOException("Canceled")
                 }
+
+                chain.proceed(request).apply {
+                    if (header("cf-mitigated") != "challenge") {
+                        return this
+                    }
+                } to chain.clearance()
             }
 
-            onPageFinished {
-                if (challengeCompleted) {
-                    resolve(Unit)
-                }
+            if (call.isCanceled()) {
+                throw IOException("Canceled")
             }
 
-            loadData(request.url.toString(), response.body.string().injectJS(OUTER_SCRIPT))
-        }
+            lock.writeLock().withLock {
+                if (call.isCanceled()) {
+                    throw IOException("Canceled")
+                }
 
-        response.close()
+                if (chain.clearance().let { it != oldClearance && !it.isNullOrBlank() }) {
+                    // Cloudflare solved in another call, skip
+                    return@withLock
+                }
+
+                resolveInWebView(chain, response.body)
+            }
+        } finally {
+            entryLock.unlock()
+        }
 
         // Use the original Cloudflare interceptor in case the solver failed
         return cloudflareInterceptor.intercept(chain)
+    }
+
+    private fun resolveInWebView(chain: Interceptor.Chain, body: ResponseBody) = runWebViewBlocking(chain.call()) {
+        val request = chain.request()
+
+        if (chain.cookieJar.loadForRequest(request.url).any { it.name == "cf_clearance" }) {
+            // Cloudflare solved in another call, skip
+            resolve(Unit)
+            return@runWebViewBlocking
+        }
+
+        request.header("User-Agent")?.let { userAgent = it }
+
+        var challengeCompleted = false
+
+        interceptRequest {
+            val requestUrl = it.url?.toString()?.toHttpUrlOrNull() ?: return@interceptRequest null
+
+            when (it.method) {
+                "GET" if requestUrl.toString().startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/") -> {
+                    client
+                        .newCall(it.toRequest())
+                        .execute()
+                        .injectJS(INNER_SCRIPT)
+                        .toWebResourceResponse()
+                }
+
+                "POST" if requestUrl.host == request.url.host &&
+                    requestUrl.encodedPath == request.url.encodedPath -> {
+                    challengeCompleted = true
+                    null
+                }
+
+                else -> null
+            }
+        }
+
+        onPageFinished {
+            if (challengeCompleted) {
+                resolve(Unit)
+            }
+        }
+
+        loadData(request.url.toString(), body.string().injectJS(OUTER_SCRIPT))
     }
 
     private fun WebResourceRequest.toRequest(): Request = Request.Builder().apply {
