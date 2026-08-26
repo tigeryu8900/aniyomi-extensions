@@ -163,9 +163,7 @@ internal class CloudflareSolverInterceptor(
      * The injected script element is prepended to the HTML, and all `Error` classes are patched so that the injected code doesn't appear in
      * stack traces and that the line numbers correspond to the original unpatched HTML.
      */
-    private fun String.injectJS(js: String, nonce: String = ""): String = "<script nonce=\"$nonce\">document.currentScript.remove();(()=>{$js;})();($ERROR_PATCHER_SCRIPT)(${
-        BASE_LINE_COUNT + js.count { it == '\n' }
-    });</script>\n$this"
+    private fun String.injectJS(js: String, nonce: String = ""): String = "<script nonce=\"$nonce\">(()=>{$js;})();</script>\n$this"
 
     /**
      * Returns a new response with the injected JavaScript code.
@@ -192,79 +190,417 @@ internal class CloudflareSolverInterceptor(
         private val nonceRegex = """(?<=nonce-)\w+""".toRegex()
 
         /**
+         * This script is injected in both the page and the iframe. It patches stack traces and creates helper functions.
+         */
+        private val COMMON_SCRIPT = $$"""
+            document.currentScript.remove();
+
+            addEventListener("message", e => console.log(`${location.origin}: ${JSON.stringify(e.data)}`));
+
+            const stackLineRegex = new RegExp(String.raw`(?<=^.*\b${RegExp.escape(location.href)}:)\d+(?=(?::\d+)?$)`);
+            const stackLineGlobalRegexString = String.raw`(?<=\b${RegExp.escape(location.href)}:)\d+`;
+
+            function patchStackLine(str) {
+              const match = str.match(stackLineRegex);
+              if (match) {
+                const newLine = parseInt(match[0]) - LINES;
+                return newLine > 0 ? {
+                  str: str.replaceAll(new RegExp(stackLineGlobalRegexString, "g"), line => parseInt(line) - LINES),
+                  line: newLine
+                } : null;
+              }
+              return { str };
+            }
+
+            function stackReduce(sites, site) {
+              const str = patchStackLine(site.toString)?.str;
+              if (str) {
+                sites.push(str);
+              }
+              return sites;
+            }
+
+            const objectToProxy = new WeakMap();
+            const proxyToObject = new WeakMap();
+
+            function createProxy(target, handler) {
+              if (objectToProxy.has(target)) {
+                return objectToProxy.get(target);
+              }
+              const proxy = new Proxy(target, handler);
+              objectToProxy.set(target, proxy);
+              proxyToObject.set(proxy, target);
+              return proxy;
+            }
+
+            function toProxy(obj) {
+              return objectToProxy.has(obj) ? objectToProxy.get(obj) : obj;
+            }
+
+            function toObject(proxy) {
+              return proxyToObject.has(proxy) ? proxyToObject.get(proxy) : proxy;
+            }
+
+            const redirectFunctionHandler = {
+              apply(target, thisArg, args) {
+                return Reflect.apply(toObject(target), toObject(thisArg), args.map(toObject));
+              }
+            };
+
+            function getRedirectPropertyHandler(redirects) {
+              return {
+                defineProperty(target, prop, descriptor) {
+                  return Reflect.defineProperty(redirects[prop] ?? target, prop, descriptor);
+                },
+                deleteProperty(target, prop) {
+                  return Reflect.deleteProperty(redirects[prop] ?? target, prop);
+                },
+                get(target, prop, receiver) {
+                  return toProxy(Reflect.get(redirects[prop] ?? target, prop, toObject(receiver)));
+                },
+                getOwnPropertyDescriptor(target, prop) {
+                  return Reflect.getOwnPropertyDescriptor(redirects[prop] ?? target, prop);
+                },
+                has(target, prop, receiver) {
+                  return Reflect.has(redirects[prop] ?? target, prop, toObject(receiver));
+                },
+                ownKeys(target) {
+                  const result = Reflect.ownKeys(target).filter(key => !(key in redirects));
+                  for (let prop in redirects) {
+                    if (prop in redirects[prop]) {
+                      result.push(prop);
+                    }
+                  }
+                  return result;
+                },
+                set(target, prop, value) {
+                  return Reflect.set(redirects[prop] ?? target, prop, toObject(value));
+                }
+              };
+            }
+
+            let CallSite;
+            Error.prepareStackTrace = (_, sites) => (CallSite = sites[0].constructor);
+            new Error().stack;
+            delete Error.prepareStackTrace;
+
+            if (CallSite) {
+              // V8, i.e. Chrome
+
+              const stackLines = new WeakMap();
+
+              function WrappedCallSite(site, patch) {
+                stackLines.set(this, Object.assign({
+                  site: site,
+                  line: site.getLineNumber()
+                }, patch));
+              }
+
+              WrappedCallSite.prototype = Object
+                .getOwnPropertyNames(CallSite.prototype)
+                .reduce((prototype, prop) => prop in prototype ? prototype : Object.assign(prototype, {
+                [prop]() {
+                  return stackLines.get(this).site[prop](...arguments);
+                }
+              }), {
+                constructor: WrappedCallSite,
+                getLineNumber() {
+                  return stackLines.get(this).line;
+                },
+                toString() {
+                  return stackLines.get(this).str;
+                }
+              });
+
+              function callSitesReduce(sites, site) {
+                const patch = patchStackLine(site.toString());
+                if (patch?.str) {
+                  sites.push(new WrappedCallSite(site, patch));
+                }
+                return sites;
+              }
+
+              function prepareStackTrace(error, callSites) {
+                return callSites.reduce(
+                  (acc, cur) => acc + "\n    at " + cur,
+                  `${error.name}: ${error.message}`
+                );
+              }
+
+              const prepareStackTraceObj = {};
+              Error.prepareStackTrace = (error, callSites) => (
+                prepareStackTraceObj.prepareStackTrace ?? prepareStackTrace
+              )(error, callSites.reduce(callSitesReduce, []));
+              window.Error = Error.prototype.constructor = createProxy(Error, getRedirectPropertyHandler({
+                prepareStackTrace: prepareStackTraceObj
+              }));
+            } else if (Object.hasOwn(Error.prototype, "stack")) {
+              // Gecko, i.e. FireFox
+
+              const stackDescriptor = Object.getOwnPropertyDescriptor(Error.prototype, "stack");
+              const stacks = WeakMap();
+
+              Object.defineProperty(Error.prototype, "stack", Object.assign({}, stackDescriptor, {
+                get: createProxy(stackDescriptor.get, {
+                  apply(target, thisArg) {
+                    thisArg = toObject(thisArg);
+                    if (stacks.has(thisArg)) {
+                      return stacks.get(thisArg);
+                    } else {
+                      const value = target.call(thisArg).split('\n').reduce(stackReduce, []).join('\n');
+                      stacks.set(thisArg, value);
+                      return value;
+                    }
+                  }
+                }),
+                set: createProxy(stackDescriptor.set, {
+                  apply(target, thisArg, [value]) {
+                    stacks.set(toObject(thisArg), toObject(value));
+                    return true;
+                  }
+                })
+              }));
+            } else {
+              // Others, i.e. Safari
+
+              const proxyErrorHandler = {
+                apply(target, thisArg, args) {
+                  const result = Reflect.apply(target, toObject(thisArg), args.map(toObject));
+                  result.stack = result.stack.split('\n').reduce(stackReduce, []).join('\n');
+                  return result;
+                },
+                construct(target, args) {
+                  const result = Reflect.construct(target, args.map(toObject));
+                  result.stack = result.stack.split('\n').reduce(stackReduce, []).join('\n');
+                  return result;
+                }
+              };
+
+              for (const prop of Object.getOwnPropertyNames(window)) {
+                try {
+                  if (window[prop] === Error || window[prop]?.prototype instanceof Error) {
+                    const proxy = createProxy(window[prop], proxyErrorHandler);
+                    Object.defineProperty(window[prop].prototype, "constructor", {value: proxy});
+                    Object.defineProperty(window, prop, {value: proxy});
+                  }
+                } catch {}
+              }
+            }
+        """.trimIndent()
+
+        private fun String.addCommonScript(): String = "LINES = ${
+            count { it == '\n' } + COMMON_SCRIPT.count { it == '\n' } + 1
+        };$COMMON_SCRIPT;$this"
+
+        /**
          * This script runs in the main frame when a Cloudflare challenge is present.
          *
          * This script patches the `postMessage` function of the challenge iframe's content window to use `*` as the target origin.
          */
         private val OUTER_SCRIPT = """
-            const contentWindowToProxy = new WeakMap();
-
-            const contentWindowDescriptor = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, "contentWindow");
+            function isContentWindow(window) {
+              try {
+                window.document;
+                return false;
+              } catch (e) {
+                return e?.name === "SecurityError";
+              }
+            }
 
             function createContentWindowProxy(result) {
-              let proxy = contentWindowToProxy.get(result);
-
-              if (proxy) {
-                return proxy;
+              if (objectToProxy.has(result)) {
+                return objectToProxy.get(result);
               }
 
-              function postMessage(message, targetOrigin, transfer) {
-                result.postMessage(message, targetOrigin === "https://challenges.cloudflare.com" ? "*" : targetOrigin, transfer);
+              if (!isContentWindow(result)) {
+                return result;
               }
 
-              proxy = new Proxy(result, {
-                get(target, prop) {
-                  const result = Reflect.get(target, prop);
-                  if (prop === "postMessage") {
-                    return postMessage;
-                  }
-                  if (typeof result === "function") {
-                    return (...args) => target[prop](...args);
-                  }
-                  return result;
+              const functionHandler = {
+                apply(target, thisArg, args) {
+                  return Reflect.apply(result, thisArg, args);
+                }
+              };
+
+              const descriptors = Object.getOwnPropertyDescriptors(result);
+
+              const functionsObj = {};
+
+              Object.defineProperties(functionsObj, {
+                focus: Object.assign(descriptors.focus, {
+                  value: createProxy(descriptors.focus.value, functionHandler)
+                }),
+                blur: Object.assign(descriptors.blur, {
+                  value: createProxy(descriptors.blur.value, functionHandler)
+                }),
+                close: Object.assign(descriptors.close, {
+                  value: createProxy(descriptors.close.value, functionHandler)
+                }),
+                postMessage: {
+                  value: createProxy(descriptors.postMessage.value, {
+                    apply(target, thisArg, args) {
+                      args = args.map(toObject);
+                      const [message, targetOrigin, transfer] = args;
+                      if (targetOrigin === "https://challenges.cloudflare.com") {
+                        args[1] = "*";
+                      }
+                      return Reflect.apply(target, toObject(thisArg), args);
+                    }
+                  })
                 }
               });
 
-              contentWindowToProxy.set(result, proxy);
+              const proxy = createProxy(result, getRedirectPropertyHandler({
+                focus: functionsObj,
+                blur: functionsObj,
+                close: functionsObj,
+                postMessage: functionsObj
+              }));
+
+              objectToProxy.set(result, proxy);
+              proxyToObject.set(proxy, result);
 
               return proxy;
             }
 
-            addEventListener = (type, listener, options) => {
-              if (type === "message") {
-                return Window.prototype.addEventListener.call(window, type, e => {
-                  let source = e.source;
-                  return listener(new Proxy(e, {
-                    get(target, prop, receiver) {
-                      if (prop === "source") {
-                        return createContentWindowProxy(target.source);
-                      } else {
-                        return target[prop];
-                      }
-                    }
-                  }));
-                }, options);
-              } else {
-                return Window.prototype.addEventListener.call(window, type, listener, options);
-              }
-            };
+            const sourcePropertyDescriptor = Object.getOwnPropertyDescriptor(MessageEvent.prototype, "source");
 
-            Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", Object.assign({}, contentWindowDescriptor, {
-              get(...args) {
-                const result = contentWindowDescriptor.get.apply(this, args);
-                return this.src?.startsWith("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/")
-                  ? createContentWindowProxy(result)
-                  : result;
-              }
+            Object.defineProperty(MessageEvent.prototype, "source", Object.assign(sourcePropertyDescriptor, {
+              get: createProxy(sourcePropertyDescriptor.get, {
+                apply(target, thisArg) {
+                  return createContentWindowProxy(target.call(toObject(thisArg)));
+                }
+              })
             }));
-        """.trimIndent()
+
+            const contentWindowDescriptor = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, "contentWindow");
+
+            Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", Object.assign(contentWindowDescriptor, {
+              get: createProxy(contentWindowDescriptor.get, {
+                apply(target, thisArg) {
+                  return createContentWindowProxy(target.call(toObject(thisArg)));
+                }
+              })
+            }));
+        """.trimIndent().addCommonScript()
 
         /**
          * This script runs in the Cloudflare challenge iframe.
          *
          * This script simulates a mouse click on the checkbox.
          */
-        private val INNER_SCRIPT = $$"""
+        private val INNER_SCRIPT = """
+            function fixIllegalInvocation(obj) {
+              try {
+                while (obj && obj !== Object.prototype) {
+                  const descriptors = Object.getOwnPropertyDescriptors(obj);
+                  for (const prop of Object.getOwnPropertyNames(descriptors).concat(Object.getOwnPropertySymbols(descriptors))) {
+                    if (prop === "constructor") {
+                      continue;
+                    }
+                    const descriptor = descriptors[prop];
+                    if (!descriptor.configurable) {
+                      continue;
+                    }
+                    if (descriptor.get) {
+                      descriptor.get = createProxy(descriptor.get, redirectFunctionHandler);
+                    }
+                    if (descriptor.set) {
+                      descriptor.set = createProxy(descriptor.set, redirectFunctionHandler);
+                    }
+                    if (typeof descriptor.value === "function") {
+                      descriptor.value = createProxy(descriptor.value, redirectFunctionHandler);
+                    }
+                    try {
+                      Object.definePropery(obj, prop, descriptor);
+                    } catch {}
+                  }
+                  obj = Object.getPrototypeOf(obj);
+                }
+              } catch {}
+            }
+
+            const shadows = new WeakMap();
+
+            function getCheckBox() {
+              return shadows.get(document.body)?.querySelector('input[type="checkbox"]');
+            }
+
+            Element.prototype.attachShadow = createProxy(Element.prototype.attachShadow, {
+              apply(target, thisArg, args) {
+                thisArg = toObject(thisArg);
+                const result = target.apply(thisArg, args.map(toObject));
+                shadows.set(thisArg, result);
+                return result;
+              }
+            });
+
+            const isTrustedPropertyDescriptor = Object.getOwnPropertyDescriptor(new Event(""), "isTrusted");
+            const isTrustedObj = {};
+
+            Object.defineProperty(isTrustedObj, "isTrusted", Object.assign(isTrustedPropertyDescriptor, {
+              get: createProxy(isTrustedPropertyDescriptor.get, {
+                apply() {
+                  return true;
+                }
+              }),
+            }));
+
+            const proxyEventHandler = getRedirectPropertyHandler({ isTrusted: isTrustedObj });
+
+            const patchedEvents = new WeakMap();
+            const original = new WeakMap();
+            const modified = new WeakMap();
+
+            Object.assign(EventTarget.prototype, {
+              addEventListener: createProxy(EventTarget.prototype.addEventListener, {
+                apply(target, thisArg, args) {
+                  thisArg = toObject(thisArg);
+                  args = args.map(toObject)
+                  const [type, listener, options] = args;
+                  if (listener instanceof Object) {
+                    if (!modified.has(listener)) {
+                      const newListener = typeof listener === "function" ? function (e) {
+                        return listener.call(this, patchedEvents.has(e) ? patchedEvents.get(e) : e);
+                      } : function (e) {
+                        return listener.handleEvent(patchedEvents.has(e) ? patchedEvents.get(e) : e);
+                      };
+                      modified.set(listener, newListener);
+                      original.set(newListener, listener);
+                    }
+                    args[1] = modified.get(listener);
+                  }
+                  return Reflect.apply(target, thisArg, args);
+                }
+              }),
+              removeEventListener: createProxy(EventTarget.prototype.removeEventListener, {
+                apply(target, thisArg, args) {
+                  thisArg = toObject(thisArg);
+                  args = args.map(toObject);
+                  const [type, listener, options] = args;
+                  if (listener instanceof Object) {
+                    args[1] = original.get(listener) ?? listener;
+                  }
+                  return Reflect.apply(target, thisArg, args);
+                }
+              })
+            });
+
+            const eventDescriptor = Object.getOwnPropertyDescriptor(window, "event");
+
+            Object.defineProperty(window, "event", Object.assign(eventDescriptor, {
+              get: createProxy(eventDescriptor.get, {
+                apply(target, thisArg) {
+                  return toProxy(target.call(thisArg));
+                }
+              }),
+              set: createProxy(eventDescriptor.set, {
+                apply(target, thisArg, [value]) {
+                  return target.call(thisArg, toObject(value));
+                }
+              })
+            }));
+
             async function simulateMouseClick(element, clientX = null, clientY = null) {
               if (clientX === null || clientY === null) {
                 const box = element.getBoundingClientRect();
@@ -292,133 +628,20 @@ internal class CloudflareSolverInterceptor(
                   clientX: clientX,
                   clientY: clientY,
                 });
+                patchedEvents.set(event, createProxy(event, proxyEventHandler));
                 element.dispatchEvent(event);
                 await new Promise(resolve => setTimeout(resolve, 10));
               }
             }
 
-            const ORIGINAL = Symbol("original");
-            const MODIFIED = Symbol("modified");
-
-            const proxyEventHandler = {
-              get(target, prop) {
-                if (prop === "isTrusted") {
-                  return true;
-                }
-                const result = Reflect.get(target, prop);
-                return typeof result === "function" ? result.bind(target) : result;
-              }
-            };
-
-            function preprocessEvent(e) {
-              if ((e.target instanceof Element && e.target.matches('input[type="checkbox"]'))) {
-                return new Proxy(e, proxyEventHandler);
-              }
-              return e;
-            }
-
-            Object.assign(Element.prototype, {
-              attachShadow: new Proxy(Element.prototype.attachShadow, {
-                apply(target, thisArg, args) {
-                  thisArg._shadowRoot = target.apply(thisArg, args);
-                  return thisArg._shadowRoot;
-                }
-              }),
-              addEventListener: new Proxy(Element.prototype.addEventListener, {
-                apply(target, thisArg, args) {
-                  const [type, listener, options] = args;
-                  if (listener instanceof Object) {
-                    if (!listener[MODIFIED]) {
-                      const newListener = typeof listener === "function" ? function (e) {
-                        return listener.call(this, preprocessEvent(e));
-                      } : function (e) {
-                        return listener.handleEvent(preprocessEvent(e));
-                      };
-                      listener[MODIFIED] = newListener;
-                      newListener[ORIGINAL] = listener;
-                    }
-                    args[1] = listener[MODIFIED];
-                  }
-                  return Reflect.apply(target, thisArg, args);
-                }
-              }),
-              removeEventListener: new Proxy(Element.prototype.removeEventListener, {
-                apply(target, thisArg, args) {
-                  const [type, listener, options] = args;
-                  if (listener instanceof Object) {
-                    args[1] = listener[ORIGINAL] ?? listener;
-                  }
-                  return Reflect.apply(target, thisArg, args);
-                }
-              })
-            });
-
-            for (const [property, value] of Object.entries({
-              visibilityState: "visible",
-              webkitVisibilityState: "visible",
-              hidden: false,
-              webkitFalse: false
-            })) {
-              try {
-                Object.defineProperty(document, property, { get: () => value });
-              } catch (e) {
-                console.error(`Cannot define document.${property}`, e);
-              }
-            }
+            fixIllegalInvocation(MouseEvent.prototype);
 
             setInterval(() => {
-              const checkbox = document.body?._shadowRoot?.querySelector('input[type="checkbox"]');
+              const checkbox = getCheckBox();
               if (checkbox) {
                 simulateMouseClick(checkbox);
               }
             }, 100);
-        """.trimIndent()
-
-        /**
-         * This script patches stack traces to hide injected code.
-         *
-         * This is needed since Cloudflare checks the stack trace.
-         */
-        private val ERROR_PATCHER_SCRIPT = $$"""
-            function errorPatcher(lines) {
-              const regex = RegExp(String.raw`^(.*)\b${RegExp.escape(location.href)}:(\d+):(\d+)$`);
-
-              function patch(error) {
-                error.stack = error.stack.split('\n').reduce((acc, line) => {
-                  const match = line.match(regex);
-                  if (match) {
-                    const row = parseInt(match[2]);
-                    if (row > lines) {
-                      acc += `\n${match[1]}${location.href}:${row - lines}:${match[3]}`
-                    }
-                  } else {
-                    acc += '\n';
-                    acc += line;
-                  }
-                  return acc;
-                }, "").substring(1);
-                return error;
-              }
-
-              const proxyErrorHandler = {
-                apply(target, thisArg, args) {
-                  return patch(Reflect.apply(target, thisArg, args));
-                },
-                construct(target, args) {
-                  return patch(Reflect.construct(target, args));
-                }
-              };
-
-              for (const prop of Object.getOwnPropertyNames(window)) {
-                try {
-                  if (window[prop] === Error || window[prop]?.prototype instanceof Error) {
-                    Object.defineProperty(window, prop, {value: new Proxy(window[prop], proxyErrorHandler)});
-                  }
-                } catch {}
-              }
-            }
-        """.trimIndent()
-
-        private val BASE_LINE_COUNT = ERROR_PATCHER_SCRIPT.count { it == '\n' } + 1
+        """.trimIndent().addCommonScript()
     }
 }
