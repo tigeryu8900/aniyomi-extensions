@@ -20,7 +20,9 @@ abstract class Asmotoon : Keyoapp() {
     override val client = super
         .client
         .newBuilder()
+        // TACH -->
         .useWaybackMachine("""^${Regex.escape(baseUrl)}/.*$""".toRegex(), preferences = preferences)
+        // <-- TACH
         .rateLimit(3, 5.seconds) { it.host == baseUrlHost }
         .build()
 
@@ -65,10 +67,12 @@ abstract class Asmotoon : Keyoapp() {
         }.joinToString()
     }
 
+    // TACH -->
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         super.setupPreferenceScreen(screen)
         setupWaybackMachinePreferenceScreen(screen)
     }
+    // <-- TACH
 
     companion object {
         private val OLD_CHAPTER_SLUG_REGEX = "(?<=/series/)[0-9a-f]{11}(?=/)".toRegex()

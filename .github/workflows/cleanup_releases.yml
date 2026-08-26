@@ -15,16 +15,20 @@ concurrency:
 jobs:
   cleanup:
     name: Remove unreferenced release assets
+    # TACH -->
     if: github.repository == 'tigeryu8900/tachiyomi-extensions'
+    # <-- TACH
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
       - name: Checkout main branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Clean up releases
         env:
-          GH_TOKEN: ${{ secrets.BOT_PAT }}
+          # TACH -->
+          GH_TOKEN: ${{ secrets.PAT }}
+          # <-- TACH
         run: python -u .github/scripts/cleanup-releases.py

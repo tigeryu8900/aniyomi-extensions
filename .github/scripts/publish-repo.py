@@ -18,7 +18,9 @@ ARTIFACTS_DIR = Path.home() / "apk-artifacts"
 # The checked-out `repo` branch we publish into (the working directory).
 REPO_DIR = Path.cwd()
 
+# TACH -->
 ICON_BASE_URL = "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main"
+# <-- TACH
 RELEASE_BASE_URL = f"https://github.com/{REPO_NAME}/releases/download"
 ASSET_LIMIT = 495  # Actual limit is 1000 but we upload 2 items per extension.
 UPLOAD_CHUNK_SIZE = 80
@@ -183,11 +185,15 @@ final_extensions.extend(ext for ext, _, _, _, _ in new_extensions)
 final_extensions.sort(key=lambda ext: ext.packageName)
 
 index = index_pb2.Index(
+    # TACH -->
     name="Tachiyomi Extensions (tigeryu8900)",
     badgeLabel="TACH",
     signingKey="3aabe16c2594c64db760ff25cd5b12d15724c4aa4e817547a8779672e8cc0bed",
+    # <-- TACH
     contact=index_pb2.Contact(
-        website="https://github.com/tigeryu8900/tachiyomi-extensions"
+        # TACH -->
+        website="https://github.com/tigeryu8900/tachiyomi-extensions",
+        # <-- TACH
     ),
     extensionList=index_pb2.ExtensionList(extensions=final_extensions),
 )
@@ -248,7 +254,9 @@ def create_release(tag: str):
         "--title",
         f"Repository Update {tag}",
         "--notes",
+        # TACH -->
         f"Automated update from tigeryu8900/tachiyomi-extensions@{current_sha}",
+        # <-- TACH
     )
 
 

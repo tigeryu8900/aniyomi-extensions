@@ -1,7 +1,9 @@
 import subprocess
 import time
 
+# TACH -->
 REPO_NAME = "tigeryu8900/tachiyomi-extensions"
+# <-- TACH
 RETRY_ATTEMPTS = 4
 RETRY_BASE_DELAY = 60
 

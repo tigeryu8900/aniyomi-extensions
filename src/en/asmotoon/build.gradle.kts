@@ -6,7 +6,9 @@ plugins {
 
 keiyoushi {
     name = "Asmodeus Scans"
+    // TACH -->
     versionCode = 4
+    // <-- TACH
     contentWarning = ContentWarning.SAFE
     libVersion = "1.4"
     theme = "keyoapp"
@@ -17,6 +19,8 @@ keiyoushi {
     }
 }
 
+// TACH -->
 dependencies {
     implementation(project(":lib:waybackmachineinterceptor"))
 }
+// <-- TACH
