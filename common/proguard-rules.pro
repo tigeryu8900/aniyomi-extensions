@@ -53,9 +53,3 @@
 
 -if @kotlinx.serialization.Serializable class **
 -keep,allowshrinking,allowoptimization,allowobfuscation class <1>
-
-# TACH -->
--dontwarn eu.kanade.tachiyomi.network.**
--dontwarn eu.kanade.tachiyomi.ui.**
--dontwarn eu.kanade.tachiyomi.util.**
-# <-- TACH
