@@ -1,1 +1,0 @@
--dontwarn eu.kanade.tachiyomi.**
