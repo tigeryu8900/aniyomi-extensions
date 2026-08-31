@@ -71,7 +71,9 @@ class WebViewTimeoutException internal constructor(
  */
 @SuppressLint("SetJavaScriptEnabled")
 class WebViewScope<T> internal constructor(
-    private val webView: WebView,
+    // TACH -->
+    val webView: WebView,
+    // <-- TACH
     private val deferred: CompletableDeferred<T>,
 ) {
     internal val pageStartedHooks = CopyOnWriteArrayList<(String) -> Unit>()
@@ -250,7 +252,9 @@ class WebViewScope<T> internal constructor(
         check(loaded.compareAndSet(false, true)) { "load already called on this WebViewScope" }
     }
 
-    private fun runOnMain(block: () -> Unit) {
+    // TACH ->
+    fun runOnMain(block: () -> Unit) {
+        // <-- TACH
         if (Looper.myLooper() == Looper.getMainLooper()) {
             block()
         } else {
@@ -514,6 +518,9 @@ private fun setupWebView(webView: WebView) {
 suspend fun <T> runWebView(
     session: WebViewSession? = null,
     timeout: Duration = 30.seconds,
+    // TACH -->
+    cleanup: WebViewScope<T>.() -> Unit,
+    // <-- TACH
     configure: WebViewScope<T>.() -> Unit,
 ): T {
     suspend fun execute(): T = withContext(Dispatchers.Main) {
@@ -540,6 +547,9 @@ suspend fun <T> runWebView(
             scope.destroyed = true
             webView.stopLoading()
             if (session != null) {
+                // TACH -->
+                scope.cleanup()
+                // <-- TACH
                 scope.bridgeNames.forEach(webView::removeJavascriptInterface)
                 session.release(dead = scope.renderDead)
             } else {
@@ -549,6 +559,14 @@ suspend fun <T> runWebView(
     }
     return session?.mutex?.withLock { execute() } ?: execute()
 }
+
+// TACH -->
+suspend fun <T> runWebView(
+    session: WebViewSession? = null,
+    timeout: Duration = 30.seconds,
+    configure: WebViewScope<T>.() -> Unit,
+): T = runWebView(session, timeout, {}, configure)
+// <-- TACH
 
 /**
  * Blocking wrapper around [runWebView] for non-suspend call sites like OkHttp interceptors.
@@ -561,6 +579,9 @@ fun <T> runWebViewBlocking(
     call: Call,
     session: WebViewSession? = null,
     timeout: Duration = 30.seconds,
+    // TACH -->
+    cleanup: WebViewScope<T>.() -> Unit,
+    // <-- TACH
     configure: WebViewScope<T>.() -> Unit,
 ): T {
     check(Looper.myLooper() != Looper.getMainLooper()) {
@@ -578,7 +599,9 @@ fun <T> runWebViewBlocking(
                 }
             }
             try {
-                runWebView(session, timeout, configure)
+                // TACH -->
+                runWebView(session, timeout, cleanup, configure)
+                // <-- TACH
             } finally {
                 watcher.cancel()
             }
@@ -587,6 +610,15 @@ fun <T> runWebViewBlocking(
         throw IOException("Canceled", e)
     }
 }
+
+// TACH -->
+fun <T> runWebViewBlocking(
+    call: Call,
+    session: WebViewSession? = null,
+    timeout: Duration = 30.seconds,
+    configure: WebViewScope<T>.() -> Unit,
+): T = runWebViewBlocking(call, session, timeout, {}, configure)
+// <-- TACH
 
 /**
  * Reads [key] from `localStorage` after loading [url], or null if unset. Loads an empty

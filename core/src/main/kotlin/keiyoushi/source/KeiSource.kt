@@ -12,8 +12,9 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.network.CacheControlInterceptor
-import keiyoushi.network.CloudflareSolverInterceptor
+import keiyoushi.network.CloudflareInterceptor
 import keiyoushi.network.RateLimitInterceptor
+import keiyoushi.utils.ForegroundActivity
 import keiyoushi.utils.applicationContext
 import keiyoushi.utils.firstInstanceOrNull
 import keiyoushi.utils.jsonInstance
@@ -59,6 +60,11 @@ abstract class KeiSource : HttpSource() {
             isAccessible = true
             set(this@KeiSource, delegate)
         }
+
+        // TACH -->
+        // make `ForegroundActivity` not lazy
+        ForegroundActivity.current
+        // <-- TACH
     }
 
     /**
@@ -111,11 +117,9 @@ abstract class KeiSource : HttpSource() {
                 val cloudflareInterceptor = firstOrNull { it.javaClass.simpleName == "CloudflareInterceptor" }
                 if (cloudflareInterceptor != null) {
                     remove(cloudflareInterceptor)
-                    add(
-                        // TACH -->
-                        CloudflareSolverInterceptor(cloudflareInterceptor),
-                        // <-- TACH
-                    )
+                    // TACH -->
+                    add(CloudflareInterceptor)
+                    // <-- TACH
                 }
             }
 

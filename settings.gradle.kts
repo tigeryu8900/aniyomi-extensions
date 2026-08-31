@@ -1,5 +1,10 @@
 @file:Suppress("ktlint:standard:kdoc")
 
+// TACH -->
+
+include(":stub")
+// TACH <--
+
 pluginManagement {
     includeBuild("gradle/build-logic")
     repositories {

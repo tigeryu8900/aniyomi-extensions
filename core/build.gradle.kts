@@ -19,6 +19,13 @@ android {
 }
 
 dependencies {
+    // TACH -->
+    implementation(libs.webkit) {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    }
+    compileOnly(project(":stub"))
+    // <-- TACH
+
     compileOnly(libs.bundles.common)
     compileOnly(libs.tachiyomi.lib.v16)
 
