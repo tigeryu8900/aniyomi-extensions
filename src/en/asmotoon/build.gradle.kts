@@ -6,11 +6,9 @@ plugins {
 
 keiyoushi {
     name = "Asmodeus Scans"
-    // TACH -->
-    versionCode = 4
-    // <-- TACH
+    versionCode = 3
     contentWarning = ContentWarning.SAFE
-    libVersion = "1.4"
+    libVersion = "1.6"
     theme = "keyoapp"
 
     source {

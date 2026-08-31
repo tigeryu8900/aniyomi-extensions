@@ -8,28 +8,25 @@ import keiyoushi.lib.waybackmachineinterceptor.setupWaybackMachinePreferenceScre
 import keiyoushi.lib.waybackmachineinterceptor.useWaybackMachine
 import keiyoushi.network.rateLimit
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.Request
-import org.jsoup.nodes.Document
+import okhttp3.OkHttpClient
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
 @Source
 abstract class Asmotoon : Keyoapp() {
-    private val baseUrlHost by lazy { baseUrl.toHttpUrl().host }
 
-    override val client = super
-        .client
-        .newBuilder()
+    private val baseUrlHost get() = baseUrl.toHttpUrl().host
+
+    override fun OkHttpClient.Builder.configureClient() = apply {
         // TACH -->
-        .useWaybackMachine("""^${Regex.escape(baseUrl)}/.*$""".toRegex(), preferences = preferences)
+        useWaybackMachine("""^${Regex.escape(baseUrl)}/.*$""".toRegex(), preferences = preferences)
         // <-- TACH
-        .rateLimit(3, 5.seconds) { it.host == baseUrlHost }
-        .build()
+        rateLimit(3, 5.seconds) { it.host == baseUrlHost }
+    }
 
-    // filtering novel entries
-    override fun popularMangaSelector() = "div:contains(Trending) + div .group:not([data-type=novel])"
-    override fun latestUpdatesSelector() = ".group:not([data-type=novel])"
-    override fun searchMangaSelector() = ".group:not([data-type=novel])"
+    override fun popularMangaSelector() = "div:contains(Trending) + div .group"
+    override fun latestUpdatesSelector() = ".group"
+    override fun searchMangaSelector() = latestUpdatesSelector()
 
     override val genreSelector: String = ".gap-3 .gap-1 a"
 
@@ -45,27 +42,6 @@ abstract class Asmotoon : Keyoapp() {
     }
 
     override fun getMangaUrl(manga: SManga): String = super.getMangaUrl(manga.fix())
-
-    override fun chapterListRequest(manga: SManga): Request = super.chapterListRequest(manga.fix())
-
-    override fun mangaDetailsRequest(manga: SManga): Request = super.mangaDetailsRequest(manga.fix())
-
-    override fun relatedMangaListRequest(manga: SManga): Request = super.relatedMangaListRequest(manga.fix())
-
-    override fun mangaDetailsParse(document: Document): SManga = super.mangaDetailsParse(document).apply {
-        genre = buildList {
-            document.selectFirst(typeSelector)?.text()?.replaceFirstChar {
-                if (it.isLowerCase()) {
-                    it.titlecase(
-                        Locale.ENGLISH,
-                    )
-                } else {
-                    it.toString()
-                }
-            }?.let(::add)
-            document.select(genreSelector).forEach { add(it.text().removeSuffix(",")) }
-        }.joinToString()
-    }
 
     // TACH -->
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
