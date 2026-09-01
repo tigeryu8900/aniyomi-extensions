@@ -1,0 +1,11 @@
+-dontwarn eu.kanade.tachiyomi.network.AndroidCookieJar
+-dontwarn eu.kanade.tachiyomi.network.NetworkHelper
+-dontwarn eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
+-dontwarn eu.kanade.tachiyomi.network.interceptor.WebViewInterceptor
+-dontwarn eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
+-dontwarn eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
+-dontwarn eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegateImpl
+-dontwarn eu.kanade.tachiyomi.ui.base.delegate.ThemingDelegate
+-dontwarn eu.kanade.tachiyomi.ui.base.delegate.ThemingDelegateImpl
+-dontwarn eu.kanade.tachiyomi.ui.main.MainActivity
+-dontwarn eu.kanade.tachiyomi.util.system.WebViewUtilKt

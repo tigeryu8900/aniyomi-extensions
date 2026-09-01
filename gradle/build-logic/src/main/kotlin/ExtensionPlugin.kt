@@ -90,7 +90,9 @@ class ExtensionPlugin : Plugin<Project> {
                         signingConfigs.getByName("debug")
                     }
                     isMinifyEnabled = true
-                    proguardFiles(rootProject.file("common/proguard-rules.pro"))
+                    // TACH -->
+                    proguardFiles(*rootProject.fileTree("common") { include("*-rules.pro") }.files.toTypedArray())
+                    // <-- TACH
                     @Suppress("UnstableApiUsage")
                     vcsInfo.include = false
                 }
