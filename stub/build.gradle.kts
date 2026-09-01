@@ -1,7 +1,6 @@
 plugins {
     id("io.github.tjokinen.android-bcv-bridge") version "0.2.0"
     alias(libs.plugins.android.library)
-    alias(libs.plugins.spotless)
 }
 
 dependencies {
