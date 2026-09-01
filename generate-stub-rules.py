@@ -1,5 +1,8 @@
+#!/usr/bin/env python3
+
 from pathlib import Path
 import re
+
 
 DIR = Path(__file__).resolve().parent
 
