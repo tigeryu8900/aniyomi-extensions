@@ -8,8 +8,11 @@ import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import keiyoushi.lib.i18n.Intl
 import okhttp3.HttpUrl
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
-class Filters {
+class MangaDexFilters {
 
     internal fun getMDFilterList(
         preferences: SharedPreferences,
@@ -22,6 +25,17 @@ class Filters {
         DemographicList(intl, getDemographics(intl)),
         StatusList(intl, getStatus(intl)),
         SortFilter(intl, getSortables(intl)),
+        DaysSinceFilter(
+            intl["created_at"],
+            "createdAtSince",
+            listOf(
+                intl["created_at_any"] to 0,
+                intl["created_at_day"] to 1,
+                intl["created_at_week"] to 7,
+                intl["created_at_month"] to 30,
+                intl["created_at_year"] to 365,
+            ),
+        ),
         TagsFilter(intl, getTagFilters(intl)),
         TagList(intl["content"], getContents(intl)),
         TagList(intl["format"], getFormats(intl)),
@@ -58,10 +72,10 @@ class Filters {
             state.filter(OriginalLanguage::state)
                 .forEach { lang ->
                     // dex has zh and zh-hk for chinese manhua
-                    if (lang.isoCode == Constants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE) {
+                    if (lang.isoCode == MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE) {
                         url.addQueryParameter(
                             "originalLanguage[]",
-                            Constants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE_HK,
+                            MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE_HK,
                         )
                     }
 
@@ -76,7 +90,7 @@ class Filters {
         intl: Intl,
     ): List<OriginalLanguage> {
         val originalLanguages = preferences.getStringSet(
-            Constants.getOriginalLanguagePrefKey(dexLang),
+            MDConstants.getOriginalLanguagePrefKey(dexLang),
             setOf(),
         )!!
 
@@ -84,26 +98,26 @@ class Filters {
             OriginalLanguage(
                 name = intl.format(
                     "original_language_filter_japanese",
-                    intl.languageDisplayName(MDIntl.JAPANESE),
+                    intl.languageDisplayName(MangaDexIntl.JAPANESE),
                 ),
-                isoCode = Constants.ORIGINAL_LANGUAGE_PREF_VAL_JAPANESE,
-                state = Constants.ORIGINAL_LANGUAGE_PREF_VAL_JAPANESE in originalLanguages,
+                isoCode = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_JAPANESE,
+                state = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_JAPANESE in originalLanguages,
             ),
             OriginalLanguage(
                 name = intl.format(
                     "original_language_filter_chinese",
-                    intl.languageDisplayName(MDIntl.CHINESE),
+                    intl.languageDisplayName(MangaDexIntl.CHINESE),
                 ),
-                isoCode = Constants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE,
-                state = Constants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE in originalLanguages,
+                isoCode = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE,
+                state = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_CHINESE in originalLanguages,
             ),
             OriginalLanguage(
                 name = intl.format(
                     "original_language_filter_korean",
-                    intl.languageDisplayName(MDIntl.KOREAN),
+                    intl.languageDisplayName(MangaDexIntl.KOREAN),
                 ),
-                isoCode = Constants.ORIGINAL_LANGUAGE_PREF_VAL_KOREAN,
-                state = Constants.ORIGINAL_LANGUAGE_PREF_VAL_KOREAN in originalLanguages,
+                isoCode = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_KOREAN,
+                state = MDConstants.ORIGINAL_LANGUAGE_PREF_VAL_KOREAN in originalLanguages,
             ),
         )
     }
@@ -125,22 +139,22 @@ class Filters {
         intl: Intl,
     ): List<ContentRating> {
         val contentRatings = preferences.getStringSet(
-            Constants.getContentRatingPrefKey(dexLang),
-            Constants.contentRatingPrefDefaults,
+            MDConstants.getContentRatingPrefKey(dexLang),
+            MDConstants.contentRatingPrefDefaults,
         )
 
         return listOf(
             ContentRating(intl["content_rating_safe"], ContentRatingDto.SAFE.value).apply {
-                state = contentRatings?.contains(Constants.CONTENT_RATING_PREF_VAL_SAFE) ?: true
+                state = contentRatings?.contains(MDConstants.CONTENT_RATING_PREF_VAL_SAFE) ?: true
             },
             ContentRating(intl["content_rating_suggestive"], ContentRatingDto.SUGGESTIVE.value).apply {
-                state = contentRatings?.contains(Constants.CONTENT_RATING_PREF_VAL_SUGGESTIVE) ?: true
+                state = contentRatings?.contains(MDConstants.CONTENT_RATING_PREF_VAL_SUGGESTIVE) ?: true
             },
             ContentRating(intl["content_rating_erotica"], ContentRatingDto.EROTICA.value).apply {
-                state = contentRatings?.contains(Constants.CONTENT_RATING_PREF_VAL_EROTICA) ?: false
+                state = contentRatings?.contains(MDConstants.CONTENT_RATING_PREF_VAL_EROTICA) ?: false
             },
             ContentRating(intl["content_rating_pornographic"], ContentRatingDto.PORNOGRAPHIC.value).apply {
-                state = contentRatings?.contains(Constants.CONTENT_RATING_PREF_VAL_PORNOGRAPHIC) ?: false
+                state = contentRatings?.contains(MDConstants.CONTENT_RATING_PREF_VAL_PORNOGRAPHIC) ?: false
             },
         )
     }
@@ -212,6 +226,22 @@ class Filters {
 
                 url.addQueryParameter("order[$query]", value)
             }
+        }
+    }
+
+    private class DaysSinceFilter(
+        name: String,
+        private val queryParam: String,
+        private val options: List<Pair<String, Int>>,
+    ) : Filter.Select<String>(name, options.map { it.first }.toTypedArray()),
+        UrlQueryFilter {
+
+        override fun addQueryParameter(url: HttpUrl.Builder, dexLang: String) {
+            val days = options[state].second.takeIf { it > 0 } ?: return
+            val since = LocalDateTime.now(ZoneOffset.UTC)
+                .minusDays(days.toLong())
+                .truncatedTo(ChronoUnit.HOURS)
+            url.addQueryParameter(queryParam, MDConstants.dateFormatterNoOffset.format(since))
         }
     }
 
@@ -389,7 +419,7 @@ class Filters {
     }
 
     private fun List<Tag>.sortIfTranslated(intl: Intl): List<Tag> = apply {
-        if (intl.chosenLanguage == MDIntl.ENGLISH) {
+        if (intl.chosenLanguage == MangaDexIntl.ENGLISH) {
             return this
         }
 

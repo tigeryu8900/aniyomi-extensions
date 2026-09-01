@@ -1,15 +1,15 @@
 package eu.kanade.tachiyomi.extension.all.mangadex.dto
 
-import eu.kanade.tachiyomi.extension.all.mangadex.Constants
+import eu.kanade.tachiyomi.extension.all.mangadex.MDConstants
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-@SerialName(Constants.AUTHOR)
+@SerialName(MDConstants.AUTHOR)
 data class AuthorDto(override val attributes: AuthorArtistAttributesDto? = null) : EntityDto()
 
 @Serializable
-@SerialName(Constants.ARTIST)
+@SerialName(MDConstants.ARTIST)
 data class ArtistDto(override val attributes: AuthorArtistAttributesDto? = null) : EntityDto()
 
 @Serializable

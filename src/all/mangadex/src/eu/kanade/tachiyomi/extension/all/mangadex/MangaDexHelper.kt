@@ -34,7 +34,6 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import keiyoushi.lib.i18n.Intl
-import keiyoushi.network.get
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
@@ -46,13 +45,13 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.parser.Parser
+import java.util.Date
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
-class Helper(lang: String) {
+class MangaDexHelper(lang: String) {
 
-    val mdFilters = Filters()
+    val mdFilters = MangaDexFilters()
 
     val json = Json {
         isLenient = true
@@ -88,13 +87,13 @@ class Helper(lang: String) {
 
     val intl = Intl(
         language = lang,
-        baseLanguage = MDIntl.ENGLISH,
-        availableLanguages = MDIntl.AVAILABLE_LANGS,
+        baseLanguage = MangaDexIntl.ENGLISH,
+        availableLanguages = MangaDexIntl.AVAILABLE_LANGS,
         classLoader = this::class.java.classLoader!!,
         createMessageFileName = { lang ->
             when (lang) {
-                MDIntl.SPANISH_LATAM -> Intl.createDefaultMessageFileName(MDIntl.SPANISH)
-                MDIntl.PORTUGUESE -> Intl.createDefaultMessageFileName(MDIntl.BRAZILIAN_PORTUGUESE)
+                MangaDexIntl.SPANISH_LATAM -> Intl.createDefaultMessageFileName(MangaDexIntl.SPANISH)
+                MangaDexIntl.PORTUGUESE -> Intl.createDefaultMessageFileName(MangaDexIntl.BRAZILIAN_PORTUGUESE)
                 else -> Intl.createDefaultMessageFileName(lang)
             }
         },
@@ -108,9 +107,9 @@ class Helper(lang: String) {
     /**
      * Get chapters for manga (aka manga/$id/feed endpoint)
      */
-    fun getChapterEndpoint(mangaId: String, offset: Int, langCode: String) = "${Constants.API_MANGA_URL}/$mangaId/feed".toHttpUrl().newBuilder()
-        .addQueryParameter("includes[]", Constants.SCANLATION_GROUP)
-        .addQueryParameter("includes[]", Constants.USER)
+    fun getChapterEndpoint(mangaId: String, offset: Int, langCode: String) = "${MDConstants.API_MANGA_URL}/$mangaId/feed".toHttpUrl().newBuilder()
+        .addQueryParameter("includes[]", MDConstants.SCANLATION_GROUP)
+        .addQueryParameter("includes[]", MDConstants.USER)
         .addQueryParameter("limit", "500")
         .addQueryParameter("offset", offset.toString())
         .addQueryParameter("translatedLanguage[]", langCode)
@@ -123,22 +122,22 @@ class Helper(lang: String) {
     /**
      * Check if the manga url is a valid uuid
      */
-    fun containsUuid(url: String) = url.contains(Constants.uuidRegex)
+    fun containsUuid(url: String) = url.contains(MDConstants.uuidRegex)
 
     /**
      * Check if the string is a valid uuid
      */
-    fun isUuid(text: String) = Constants.uuidRegex matches text
+    fun isUuid(text: String) = MDConstants.uuidRegex matches text
 
     /**
      * Get the manga offset pages are 1 based, so subtract 1
      */
-    fun getMangaListOffset(page: Int): String = (Constants.MANGA_LIMIT * (page - 1)).toString()
+    fun getMangaListOffset(page: Int): String = (MDConstants.MANGA_LIMIT * (page - 1)).toString()
 
     /**
      * Get the latest chapter offset pages are 1 based, so subtract 1
      */
-    fun getLatestChapterOffset(page: Int): String = (Constants.LATEST_CHAPTER_LIMIT * (page - 1)).toString()
+    fun getLatestChapterOffset(page: Int): String = (MDConstants.LATEST_CHAPTER_LIMIT * (page - 1)).toString()
 
     /**
      * Remove any HTML characters in manga or chapter name to actual
@@ -177,8 +176,8 @@ class Helper(lang: String) {
         val publishedOrCancelled = tempStatus == SManga.PUBLISHING_FINISHED ||
             tempStatus == SManga.CANCELLED
 
-        val isOneShot = attr.tags.any { it.id == Constants.TAG_ONE_SHOT_UUID } &&
-            attr.tags.none { it.id == Constants.TAG_ANTHOLOGY_UUID }
+        val isOneShot = attr.tags.any { it.id == MDConstants.TAG_ONE_SHOT_UUID } &&
+            attr.tags.none { it.id == MDConstants.TAG_ANTHOLOGY_UUID }
 
         return when {
             chaptersList.contains(attr.lastChapter) && publishedOrCancelled -> SManga.COMPLETED
@@ -186,6 +185,8 @@ class Helper(lang: String) {
             else -> tempStatus
         }
     }
+
+    private fun parseDate(dateAsString: String): Long = MDConstants.dateFormatter.parse(dateAsString)?.time ?: 0
 
     /**
      * Chapter URL where we get the token, last request time.
@@ -197,8 +198,8 @@ class Helper(lang: String) {
             .maxStale(Int.MAX_VALUE.seconds)
             .build()
 
-        val markdownLinksRegex = "\\[([^]]+)]\\(([^)]+)\\)".toRegex()
-        val markdownItalicBoldRegex = "\\*+\\s*([^*]*)\\s*\\*+".toRegex()
+        val markdownLinksRegex = "\\[([^]]+)\\]\\(([^)]+)\\)".toRegex()
+        val markdownItalicBoldRegex = "\\*+\\s*([^\\*]*)\\s*\\*+".toRegex()
         val markdownItalicRegex = "_+\\s*([^_]*)\\s*_+".toRegex()
 
         val titleSpecialCharactersRegex = "[^a-z0-9]+".toRegex()
@@ -209,16 +210,16 @@ class Helper(lang: String) {
     /**
      * Check the token map to see if the MD@Home host is still valid.
      */
-    suspend fun getValidImageUrlForPage(page: Page, headers: Headers, client: OkHttpClient): Request {
+    fun getValidImageUrlForPage(page: Page, headers: Headers, client: OkHttpClient): Request {
         val (host, tokenRequestUrl, time) = page.url.split(",")
 
         val mdAtHomeServerUrl =
-            when (System.currentTimeMillis() - time.toLong() > Constants.mdAtHomeTokenLifespan) {
+            when (Date().time - time.toLong() > MDConstants.mdAtHomeTokenLifespan) {
                 false -> host
 
                 true -> {
-                    val tokenLifespan = System.currentTimeMillis() - (tokenTracker[tokenRequestUrl] ?: 0)
-                    val cacheControl = if (tokenLifespan > Constants.mdAtHomeTokenLifespan) {
+                    val tokenLifespan = Date().time - (tokenTracker[tokenRequestUrl] ?: 0)
+                    val cacheControl = if (tokenLifespan > MDConstants.mdAtHomeTokenLifespan) {
                         CacheControl.FORCE_NETWORK
                     } else {
                         USE_CACHE
@@ -233,17 +234,14 @@ class Helper(lang: String) {
     /**
      * Get the MD@Home URL.
      */
-    private suspend fun getMdAtHomeUrl(
+    private fun getMdAtHomeUrl(
         tokenRequestUrl: String,
         client: OkHttpClient,
         headers: Headers,
         cacheControl: CacheControl,
     ): String {
-        if (cacheControl == CacheControl.FORCE_NETWORK) {
-            mdRefreshToken(tokenRequestUrl)
-        }
-
-        val response = client.get(tokenRequestUrl, headers, cacheControl)
+        val request = mdAtHomeRequest(tokenRequestUrl, headers, cacheControl)
+        val response = client.newCall(request).execute()
 
         // This check is for the error that causes pages to fail to load.
         // It should never be entered, but in case it is, we retry the request.
@@ -256,10 +254,18 @@ class Helper(lang: String) {
     }
 
     /**
-     * Set the token time to now
+     * create an md at home Request
      */
-    fun mdRefreshToken(tokenRequestUrl: String) {
-        tokenTracker[tokenRequestUrl] = System.currentTimeMillis()
+    fun mdAtHomeRequest(
+        tokenRequestUrl: String,
+        headers: Headers,
+        cacheControl: CacheControl,
+    ): Request {
+        if (cacheControl == CacheControl.FORCE_NETWORK) {
+            tokenTracker[tokenRequestUrl] = Date().time
+        }
+
+        return GET(tokenRequestUrl, headers, cacheControl)
     }
 
     private fun List<Map<String, String>>.findTitleByLang(lang: String): String? = firstOrNull { it[lang] != null }?.values?.singleOrNull()
@@ -293,8 +299,8 @@ class Helper(lang: String) {
 
         coverFileName?.let {
             thumbnail_url = when (!coverSuffix.isNullOrEmpty()) {
-                true -> "${Constants.CDN_URL}/covers/${mangaDataDto.id}/$coverFileName$coverSuffix"
-                else -> "${Constants.CDN_URL}/covers/${mangaDataDto.id}/$coverFileName"
+                true -> "${MDConstants.CDN_URL}/covers/${mangaDataDto.id}/$coverFileName$coverSuffix"
+                else -> "${MDConstants.CDN_URL}/covers/${mangaDataDto.id}/$coverFileName"
             }
         }
     }
@@ -350,7 +356,7 @@ class Helper(lang: String) {
             .groupBy({ it.attributes!!.group }) { tagDto -> tags[tagDto.id] }
             .mapValues { it.value.filterNotNull().sortedWith(intl.collator) }
 
-        val genreList = Constants.TAG_GROUPS_ORDER.flatMap { genresMap[it].orEmpty() } + nonGenres
+        val genreList = MDConstants.TAG_GROUPS_ORDER.flatMap { genresMap[it].orEmpty() } + nonGenres
 
         // Build description
         val desc = mutableListOf<String>()
@@ -360,7 +366,7 @@ class Helper(lang: String) {
             ?.let { desc.add(it) }
 
         if (altTitlesInDesc) {
-            val romanizedOriginalLang = Constants.romanizedLangCodes[attr.originalLanguage].orEmpty()
+            val romanizedOriginalLang = MDConstants.romanizedLangCodes[attr.originalLanguage].orEmpty()
             val altTitles = attr.altTitles
                 .filter { it.containsKey(lang) || it.containsKey(romanizedOriginalLang) }
                 .mapNotNull { it.values.singleOrNull() }
@@ -404,7 +410,7 @@ class Helper(lang: String) {
 
         val groups = chapterDataDto.relationships
             .filterIsInstance<ScanlationGroupDto>()
-            .filterNot { it.id == Constants.LEGACY_NO_GROUP_ID } // 'no group' left over from MDv3
+            .filterNot { it.id == MDConstants.LEGACY_NO_GROUP_ID } // 'no group' left over from MDv3
             .mapNotNull { it.attributes?.name }
             .joinToString(" & ")
             .ifEmpty {
@@ -447,7 +453,7 @@ class Helper(lang: String) {
 
         // In future calculate [END] if non mvp api doesn't provide it
 
-        val unavailablePrefix = if (attr.isUnavailable) {
+        val unavailablePrefix = if (attr.isUnavailable == true) {
             intl["chapter_unavailable_prefix"] + " - "
         } else {
             ""
@@ -456,7 +462,7 @@ class Helper(lang: String) {
         return SChapter.create().apply {
             url = "/chapter/${chapterDataDto.id}"
             name = chapterName.joinToString(" ").removeEntities()
-            date_upload = Instant.parseOrNull(attr.publishAt)?.toEpochMilliseconds() ?: 0L
+            date_upload = parseDate(attr.publishAt)
             scanlator = unavailablePrefix + groups
         }
     }

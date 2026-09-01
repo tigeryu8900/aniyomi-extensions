@@ -1,11 +1,11 @@
 package eu.kanade.tachiyomi.extension.all.mangadex.dto
 
-import eu.kanade.tachiyomi.extension.all.mangadex.Constants
+import eu.kanade.tachiyomi.extension.all.mangadex.MDConstants
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-@SerialName(Constants.SCANLATION_GROUP)
+@SerialName(MDConstants.SCANLATION_GROUP)
 data class ScanlationGroupDto(override val attributes: ScanlationGroupAttributes? = null) : EntityDto()
 
 @Serializable
