@@ -11,13 +11,13 @@
         "name": "MangaDex",
         "packageName": "eu.kanade.tachiyomi.extension.all.mangadex",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-all.mangadex-v1.6.212.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/1a3bb48/tachiyomi-all.mangadex-v1.4.212.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/all/mangadex/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-all.mangadex-v1.6.212.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/1a3bb48/tachiyomi-all.mangadex-v1.4.212.jar"
         },
-        "extensionLib": "1.6",
+        "extensionLib": "1.4",
         "versionCode": "212",
-        "versionName": "1.6.212",
+        "versionName": "1.4.212",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
