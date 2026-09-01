@@ -1,0 +1,103 @@
+public final class eu/kanade/tachiyomi/network/AndroidCookieJar : okhttp3/CookieJar {
+	public fun <init> ()V
+	public final fun get (Lokhttp3/HttpUrl;)Ljava/util/List;
+	public fun loadForRequest (Lokhttp3/HttpUrl;)Ljava/util/List;
+	public final fun remove (Lokhttp3/HttpUrl;Ljava/util/List;I)I
+	public static synthetic fun remove$default (Leu/kanade/tachiyomi/network/AndroidCookieJar;Lokhttp3/HttpUrl;Ljava/util/List;IILjava/lang/Object;)I
+	public final fun removeAll ()V
+	public fun saveFromResponse (Lokhttp3/HttpUrl;Ljava/util/List;)V
+}
+
+public final class eu/kanade/tachiyomi/network/NetworkHelper {
+	public fun <init> (Landroid/content/Context;)V
+	public final fun getClient ()Lokhttp3/OkHttpClient;
+	public final fun getCookieJar ()Leu/kanade/tachiyomi/network/AndroidCookieJar;
+}
+
+public final class eu/kanade/tachiyomi/network/interceptor/CloudflareInterceptor : eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor {
+	public fun <init> (Landroid/content/Context;Leu/kanade/tachiyomi/network/AndroidCookieJar;Lkotlin/jvm/functions/Function0;)V
+	public fun intercept (Lokhttp3/Interceptor$Chain;Lokhttp3/Request;Lokhttp3/Response;)Lokhttp3/Response;
+	public fun shouldIntercept (Lokhttp3/Response;)Z
+}
+
+public abstract class eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor : okhttp3/Interceptor {
+	public fun <init> (Landroid/content/Context;Lkotlin/jvm/functions/Function0;)V
+	public final fun awaitFor30Seconds (Ljava/util/concurrent/CountDownLatch;)V
+	public final fun createWebView (Lokhttp3/Request;)Landroid/webkit/WebView;
+	public fun intercept (Lokhttp3/Interceptor$Chain;)Lokhttp3/Response;
+	public abstract fun intercept (Lokhttp3/Interceptor$Chain;Lokhttp3/Request;Lokhttp3/Response;)Lokhttp3/Response;
+	public final fun parseHeaders (Lokhttp3/Headers;)Ljava/util/Map;
+	public abstract fun shouldIntercept (Lokhttp3/Response;)Z
+}
+
+public class eu/kanade/tachiyomi/ui/base/activity/BaseActivity : androidx/appcompat/app/AppCompatActivity, eu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegate, eu/kanade/tachiyomi/ui/base/delegate/ThemingDelegate {
+	public fun <init> ()V
+	public fun applyAppTheme (Landroid/app/Activity;)V
+	protected fun attachBaseContext (Landroid/content/Context;)Ljava/lang/Void;
+	public synthetic fun attachBaseContext (Landroid/content/Context;)V
+	protected fun onCreate (Landroid/os/Bundle;)Ljava/lang/Void;
+	public synthetic fun onCreate (Landroid/os/Bundle;)V
+	public fun registerSecureActivity (Landroidx/appcompat/app/AppCompatActivity;)V
+}
+
+public abstract interface class eu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegate {
+	public static final field Companion Leu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegate$Companion;
+	public static final field LOCK_ALL_DAYS I
+	public static final field LOCK_FRIDAY I
+	public static final field LOCK_MONDAY I
+	public static final field LOCK_SATURDAY I
+	public static final field LOCK_SUNDAY I
+	public static final field LOCK_THURSDAY I
+	public static final field LOCK_TUESDAY I
+	public static final field LOCK_WEDNESDAY I
+	public abstract fun registerSecureActivity (Landroidx/appcompat/app/AppCompatActivity;)V
+}
+
+public final class eu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegate$Companion {
+	public static final field LOCK_ALL_DAYS I
+	public static final field LOCK_FRIDAY I
+	public static final field LOCK_MONDAY I
+	public static final field LOCK_SATURDAY I
+	public static final field LOCK_SUNDAY I
+	public static final field LOCK_THURSDAY I
+	public static final field LOCK_TUESDAY I
+	public static final field LOCK_WEDNESDAY I
+	public final fun getRequireUnlock ()Z
+	public final fun onApplicationStart ()V
+	public final fun onApplicationStopped ()V
+	public final fun setRequireUnlock (Z)V
+	public final fun unlock ()V
+}
+
+public final class eu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegateImpl : androidx/lifecycle/DefaultLifecycleObserver, eu/kanade/tachiyomi/ui/base/delegate/SecureActivityDelegate {
+	public fun <init> ()V
+	public fun onCreate (Landroidx/lifecycle/LifecycleOwner;)Ljava/lang/Void;
+	public synthetic fun onCreate (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun onDestroy (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun onPause (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun onResume (Landroidx/lifecycle/LifecycleOwner;)Ljava/lang/Void;
+	public synthetic fun onResume (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun onStart (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun onStop (Landroidx/lifecycle/LifecycleOwner;)V
+	public fun registerSecureActivity (Landroidx/appcompat/app/AppCompatActivity;)Ljava/lang/Void;
+	public synthetic fun registerSecureActivity (Landroidx/appcompat/app/AppCompatActivity;)V
+}
+
+public abstract interface class eu/kanade/tachiyomi/ui/base/delegate/ThemingDelegate {
+	public abstract fun applyAppTheme (Landroid/app/Activity;)V
+}
+
+public final class eu/kanade/tachiyomi/ui/base/delegate/ThemingDelegateImpl : eu/kanade/tachiyomi/ui/base/delegate/ThemingDelegate {
+	public fun <init> ()V
+	public fun applyAppTheme (Landroid/app/Activity;)Ljava/lang/Void;
+	public synthetic fun applyAppTheme (Landroid/app/Activity;)V
+}
+
+public final class eu/kanade/tachiyomi/ui/main/MainActivity : eu/kanade/tachiyomi/ui/base/activity/BaseActivity {
+	public fun <init> ()V
+}
+
+public final class eu/kanade/tachiyomi/util/system/WebViewUtilKt {
+	public static final fun isOutdated (Landroid/webkit/WebView;)Z
+}
+
