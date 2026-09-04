@@ -2,6 +2,7 @@ package keiyoushi.network
 
 import android.app.Application
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -30,14 +31,6 @@ import kotlin.concurrent.withLock
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor as OldCloudflareInterceptor
 
 internal object CloudflareInterceptor : Interceptor {
-    // Fallback JavaScript solver for when view group isn't available (i.e. app in background)
-    private val iframeScript by lazy {
-        javaClass
-            .getResource("/assets/CloudflareSolverIframeScript.js")!!
-            .readText()
-            .replace("__SOLVER__", "__SOLVER_${(ULong.MIN_VALUE..ULong.MAX_VALUE).random()}__")
-    }
-
     private val listenerScript = """
         addEventListener("message", ({data}) => {
             if (data?.source === "cloudflare-challenge") {
@@ -96,15 +89,9 @@ internal object CloudflareInterceptor : Interceptor {
         }
     }
 
-    private fun injectIframeScript(webview: WebView): ScriptHandler? = if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-        WebViewCompat.addDocumentStartJavaScript(
-            webview,
-            iframeScript,
-            mutableSetOf("https://challenges.cloudflare.com"),
-        )
-    } else {
-        null
-    }
+    private const val DEFAULT_WIDTH = 1920
+
+    private const val DEFAULT_HEIGHT = 1080
 
     private fun clearance(url: HttpUrl): String? = networkHelper.cookieJar.loadForRequest(url).find { it.name == "cf_clearance" }?.value
 
@@ -156,6 +143,35 @@ internal object CloudflareInterceptor : Interceptor {
         return chain.proceed(request)
     }
 
+    private fun WebView.layOutHeadless() {
+        val spec = { n: Int -> View.MeasureSpec.makeMeasureSpec(n, View.MeasureSpec.EXACTLY) }
+        measure(spec(DEFAULT_WIDTH), spec(DEFAULT_HEIGHT))
+        layout(0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        isFocusable = true
+        isFocusableInTouchMode = true
+        dispatchWindowVisibilityChanged(View.VISIBLE)
+        dispatchWindowFocusChanged(true)
+        requestFocus()
+    }
+
+    private fun WebView.dispatchKeyEvent(action: Int, code: Int): Boolean {
+        if (!dispatchKeyEvent(KeyEvent(action, code))) {
+            layOutHeadless()
+            if (!dispatchKeyEvent(KeyEvent(action, code))) return false
+        }
+        return true
+    }
+
+    private fun WebView.sendTabSpace(): Boolean {
+        if (!dispatchKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB)) return false
+        Thread.sleep((10L..100L).random())
+        if (!dispatchKeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB)) return false
+        Thread.sleep((10L..100L).random())
+        if (!dispatchKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE)) return false
+        Thread.sleep((10L..100L).random())
+        return dispatchKeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE)
+    }
+
     private fun resolveInWebView(
         chain: Interceptor.Chain,
         body: ResponseBody,
@@ -167,7 +183,6 @@ internal object CloudflareInterceptor : Interceptor {
 
         var fail = false
 
-        var iframeScriptHandler: ScriptHandler? = null
         var listenerScriptHandler: ScriptHandler? = null
 
         return runWebViewBlocking(chain.call(), cleanup = {
@@ -185,40 +200,19 @@ internal object CloudflareInterceptor : Interceptor {
                     WebViewCompat.getExecutionWorld(webView, "CloudflareInterceptor"),
                     "jsBridge",
                 )
-                iframeScriptHandler?.remove()
                 listenerScriptHandler?.remove()
             }
         }) {
             request.header("User-Agent")?.let { userAgent = it }
 
-            webView.apply {
-                isFocusable = false
-                isFocusableInTouchMode = false
-                descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            }
+            webView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
 
             if (ForegroundActivity.viewGroup == null) {
-                // view group not available, using fallback JavaScript solver
-                synchronized(webView) {
-                    if (iframeScriptHandler == null) {
-                        iframeScriptHandler = injectIframeScript(webView)
-                    }
-                }
-            }
-
-            // Inject fallback JavaScript solver
-            fun injectIframeScript() {
-                synchronized(webView) {
-                    if (iframeScriptHandler == null) {
-                        iframeScriptHandler = injectIframeScript(webView)
-                    }
-                }
-                if (iframeScriptHandler != null) {
-                    webView.loadDataWithBaseURL(url.toString(), html, "text/html", "UTF-8", null)
-                } else {
-                    // Feature not supported, abort
-                    fail = true
-                    resolve(false)
+                webView.layOutHeadless()
+            } else {
+                webView.apply {
+                    isFocusable = false
+                    isFocusableInTouchMode = false
                 }
             }
 
@@ -227,82 +221,32 @@ internal object CloudflareInterceptor : Interceptor {
             fun handleEvent(event: String) {
                 when (event) {
                     "interactiveBegin" -> {
-                        if (iframeScriptHandler != null) {
-                            // Fallback solver is injected
-                            thread {
-                                // Fallback solver should complete within a short amount of time
-                                Thread.sleep(5000)
-                                if (!complete) {
-                                    fail = true
-                                    resolve(false)
-                                }
-                            }
-                            return
-                        }
-
                         // Get the current view group
                         val container = ForegroundActivity.viewGroup
                         if (container == null) {
-                            injectIframeScript()
-                            return
+                            webView.layOutHeadless()
                         }
 
                         runOnMain {
-                            val width = container.width.takeIf { it > 0 } ?: 1920
-                            val height = container.height.takeIf { it > 0 } ?: 1080
+                            if (container != null) {
+                                val width = container.width.takeIf { it > 0 } ?: DEFAULT_WIDTH
+                                val height = container.height.takeIf { it > 0 } ?: DEFAULT_HEIGHT
 
-                            // Set translationX to negative width.
-                            // The WebView should be offscreen even when the orientation changes.
-                            webView.translationX = -width.toFloat()
+                                // Set translationX to negative width.
+                                // The WebView should be offscreen even when the orientation changes.
+                                webView.translationX = -width.toFloat()
 
-                            // Attach the WebView to the view group so we can send key events.
-                            container.addView(webView, ViewGroup.LayoutParams(width, height))
+                                // Attach the WebView to the view group so we can send key events.
+                                container.addView(webView, ViewGroup.LayoutParams(width, height))
+                            }
 
                             // Send Tab and Space to check the checkbox, and fall back to JavaScript solver
                             // if dispatchKeyEvent fails.
                             // Use a separate thread to unblock the main thread.
                             thread {
-                                if (!webView.dispatchKeyEvent(
-                                        KeyEvent(
-                                            KeyEvent.ACTION_DOWN,
-                                            KeyEvent.KEYCODE_TAB,
-                                        ),
-                                    )
-                                ) {
-                                    injectIframeScript()
-                                    return@thread
-                                }
-                                Thread.sleep(100)
-                                if (!webView.dispatchKeyEvent(
-                                        KeyEvent(
-                                            KeyEvent.ACTION_UP,
-                                            KeyEvent.KEYCODE_TAB,
-                                        ),
-                                    )
-                                ) {
-                                    injectIframeScript()
-                                    return@thread
-                                }
-                                Thread.sleep(100)
-                                if (!webView.dispatchKeyEvent(
-                                        KeyEvent(
-                                            KeyEvent.ACTION_DOWN,
-                                            KeyEvent.KEYCODE_SPACE,
-                                        ),
-                                    )
-                                ) {
-                                    injectIframeScript()
-                                    return@thread
-                                }
-                                Thread.sleep(100)
-                                if (!webView.dispatchKeyEvent(
-                                        KeyEvent(
-                                            KeyEvent.ACTION_UP,
-                                            KeyEvent.KEYCODE_SPACE,
-                                        ),
-                                    )
-                                ) {
-                                    injectIframeScript()
+                                if (!webView.sendTabSpace()) {
+                                    fail = true
+                                    resolve(false)
                                     return@thread
                                 }
 
