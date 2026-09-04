@@ -13,10 +13,10 @@
         "resources": {
           "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/1a3bb48/tachiyomi-all.mangadex-v1.4.212.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/all/mangadex/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/1a3bb48/tachiyomi-all.mangadex-v1.4.212.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-all.mangadex-v1.4.212.jar"
         },
         "extensionLib": "1.4",
-        "versionCode": "212",
+        "versionCode": "104212",
         "versionName": "1.4.212",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
@@ -392,12 +392,12 @@
         "name": "MangaFire",
         "packageName": "eu.kanade.tachiyomi.extension.all.mangafire",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/a9196fc/tachiyomi-all.mangafire-v1.6.32.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-all.mangafire-v1.6.32.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/all/mangafire/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/a9196fc/tachiyomi-all.mangafire-v1.6.32.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-all.mangafire-v1.6.32.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "32",
+        "versionCode": "106032",
         "versionName": "1.6.32",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
@@ -449,12 +449,12 @@
         "name": "Art Lapsa",
         "packageName": "eu.kanade.tachiyomi.extension.en.artlapsa",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.artlapsa-v1.6.26.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.artlapsa-v1.6.26.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/artlapsa/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.artlapsa-v1.6.26.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.artlapsa-v1.6.26.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "26",
+        "versionCode": "106026",
         "versionName": "1.6.26",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
@@ -470,12 +470,12 @@
         "name": "Asmodeus Scans",
         "packageName": "eu.kanade.tachiyomi.extension.en.asmotoon",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.asmotoon-v1.6.24.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.asmotoon-v1.6.24.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/asmotoon/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.asmotoon-v1.6.24.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.asmotoon-v1.6.24.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "24",
+        "versionCode": "106024",
         "versionName": "1.6.24",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
@@ -491,13 +491,13 @@
         "name": "Mangabat",
         "packageName": "eu.kanade.tachiyomi.extension.en.mangabat",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.mangabat-v1.6.24.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.mangabat-v1.6.23.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/mangabat/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.mangabat-v1.6.24.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.mangabat-v1.6.23.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "24",
-        "versionName": "1.6.24",
+        "versionCode": "106023",
+        "versionName": "1.6.23",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
@@ -512,13 +512,13 @@
         "name": "Mangakakalot",
         "packageName": "eu.kanade.tachiyomi.extension.en.mangakakalot",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.mangakakalot-v1.6.25.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.mangakakalot-v1.6.24.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/mangakakalot/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.mangakakalot-v1.6.25.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.mangakakalot-v1.6.24.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "25",
-        "versionName": "1.6.25",
+        "versionCode": "106024",
+        "versionName": "1.6.24",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
@@ -537,13 +537,13 @@
         "name": "Manganato",
         "packageName": "eu.kanade.tachiyomi.extension.en.manganelo",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.manganelo-v1.6.23.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.manganelo-v1.6.22.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/manganelo/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.manganelo-v1.6.23.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.manganelo-v1.6.22.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "23",
-        "versionName": "1.6.23",
+        "versionCode": "106022",
+        "versionName": "1.6.22",
         "contentWarning": "CONTENT_WARNING_MIXED",
         "sources": [
           {
@@ -563,12 +563,12 @@
         "name": "RitharScans",
         "packageName": "eu.kanade.tachiyomi.extension.en.ritharscans",
         "resources": {
-          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.ritharscans-v1.6.24.apk",
+          "apkUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.ritharscans-v1.6.24.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/tigeryu8900/tachiyomi-extensions@main/src/en/ritharscans/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/0eb0dcd/tachiyomi-en.ritharscans-v1.6.24.jar"
+          "jarUrl": "https://github.com/tigeryu8900/tachiyomi-extensions/releases/download/3a0d105/tachiyomi-en.ritharscans-v1.6.24.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "24",
+        "versionCode": "106024",
         "versionName": "1.6.24",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
