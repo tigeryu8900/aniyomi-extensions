@@ -25,7 +25,9 @@ class ChallengeSolverInterceptor(
 
     private fun clearance(url: HttpUrl) = cookieJar.loadForRequest(url).find { it.name == "waf_pass" }?.value
 
+    // TACH -->
     private var clientHintsHeaders: Map<String, String> = mapOf()
+    // <-- TACH
 
     @Serializable
     private data class ErrorResponse(
@@ -34,11 +36,13 @@ class ChallengeSolverInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val call = chain.call()
+        // TACH -->
         val request = chain
             .request()
             .newBuilder()
             .apply { clientHintsHeaders.forEach { header(it.key, it.value) } }
             .build()
+        // <-- TACH
         val url = request.url
 
         val oldClearance = lock.readLock().withLock {
@@ -82,15 +86,17 @@ class ChallengeSolverInterceptor(
             }
 
             runWebViewBlocking(call) {
+                // TACH -->
                 userAgent = request.header("User-Agent").orEmpty()
-                jsBridge("bridge") { resolve(it == "true") }
-                loadData("https://${url.host}/@waf/solver", html)
                 interceptRequest { webResourceRequest ->
                     clientHintsHeaders = webResourceRequest
                         .requestHeaders
                         .filterKeys { it.startsWith("sec-ch-ua", ignoreCase = true) }
                     null
                 }
+                // <-- TACH
+                jsBridge("bridge") { resolve(it == "true") }
+                loadData("https://${url.host}/@waf/solver", html)
             }
         }
 
