@@ -181,28 +181,9 @@ internal object CloudflareInterceptor : Interceptor {
         val url = request.url
         val html = body.string()
 
-        var fail = false
+        var webViewOutdated = false
 
-        var listenerScriptHandler: ScriptHandler? = null
-
-        return runWebViewBlocking(chain.call(), cleanup = {
-            if (fail && webView.isOutdated()) {
-                Toast.makeText(
-                    Injekt.get<Application>(),
-                    "Please update the WebView app for better compatibility",
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.JS_INJECTION_IN_FRAME_AND_WORLD)) {
-                WebViewCompat.removeWebMessageListener(
-                    webView,
-                    WebViewCompat.getExecutionWorld(webView, "CloudflareInterceptor"),
-                    "jsBridge",
-                )
-                listenerScriptHandler?.remove()
-            }
-        }) {
+        val success = runWebViewBlocking(chain.call()) {
             request.header("User-Agent")?.let { userAgent = it }
 
             webView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
@@ -216,6 +197,7 @@ internal object CloudflareInterceptor : Interceptor {
                 }
             }
 
+            var fail = false
             var complete = false
 
             fun handleEvent(event: String) {
@@ -246,6 +228,7 @@ internal object CloudflareInterceptor : Interceptor {
                             thread {
                                 if (!webView.sendTabSpace()) {
                                     fail = true
+                                    webViewOutdated = webView.isOutdated()
                                     resolve(false)
                                     return@thread
                                 }
@@ -254,6 +237,7 @@ internal object CloudflareInterceptor : Interceptor {
                                 Thread.sleep(5000)
                                 if (!complete) {
                                     fail = true
+                                    webViewOutdated = webView.isOutdated()
                                     resolve(false)
                                 }
                             }
@@ -265,6 +249,7 @@ internal object CloudflareInterceptor : Interceptor {
                     "fail" -> {
                         // Challenge failed, abort
                         fail = true
+                        webViewOutdated = webView.isOutdated()
                         resolve(false)
                     }
                 }
@@ -288,7 +273,7 @@ internal object CloudflareInterceptor : Interceptor {
                 }
 
                 // Listen for message events
-                listenerScriptHandler = WebViewCompat.addJavaScriptOnEvent(
+                WebViewCompat.addJavaScriptOnEvent(
                     webView,
                     listenerScript,
                     WebViewCompat.INJECTION_EVENT_DOCUMENT_START,
@@ -322,5 +307,15 @@ internal object CloudflareInterceptor : Interceptor {
 
             loadData(url.toString(), html)
         }
+
+        if (webViewOutdated) {
+            Toast.makeText(
+                Injekt.get<Application>(),
+                "Please update the WebView app for better compatibility",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+
+        return success
     }
 }
