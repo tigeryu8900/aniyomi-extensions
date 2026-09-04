@@ -76,6 +76,9 @@ class ChallengeSolverInterceptor(
             }
 
             runWebViewBlocking(call) {
+                // TACH -->
+                userAgent = request.header("User-Agent").orEmpty()
+                // <-- TACH
                 jsBridge("bridge") { resolve(it == "true") }
                 loadData("https://${url.host}/@waf/solver", html)
             }

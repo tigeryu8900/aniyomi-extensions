@@ -19,6 +19,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import eu.kanade.tachiyomi.network.NetworkHelper
+import keiyoushi.network.clientHints
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -344,6 +345,7 @@ private class ScopeWebViewClient(
         }
     }
 
+    /* TACH -->
     private fun clientHints(userAgent: String?): Map<String, String> {
         userAgent ?: return emptyMap()
         val (name, version, chromiumVersion) = when {
@@ -393,11 +395,14 @@ private class ScopeWebViewClient(
             "Sec-CH-UA-Platform" to platform,
         )
     }
+    <-- TACH */
 
     private companion object {
-        val CHROME_REGEX = Regex("""Chrome/(\d+)""")
-        val EDGE_REGEX = Regex("""Edg[^/]*/(\d+)""")
-        val OPERA_REGEX = Regex("""OPR/(\d+)""")
+        // TACH -->
+        //val CHROME_REGEX = Regex("""Chrome/(\d+)""")
+        //val EDGE_REGEX = Regex("""Edg[^/]*/(\d+)""")
+        //val OPERA_REGEX = Regex("""OPR/(\d+)""")
+        // <-- TACH
         val NO_BODY_METHODS = setOf("GET", "HEAD", "OPTIONS")
     }
 
