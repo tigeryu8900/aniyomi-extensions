@@ -15,83 +15,83 @@ or fix them directly by submitting a Pull Request.
 ## Table of Contents
 
 - [Contributing](#contributing)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-    - [Tools](#tools)
-    - [Cloning the repository](#cloning-the-repository)
-  - [Getting help](#getting-help)
-  - [Writing an extension](#writing-an-extension)
-    - [Setting up a new Gradle module](#setting-up-a-new-gradle-module)
-      - [Using ext-bootstrap.py](#using-ext-bootstrappy)
-    - [Loading a subset of Gradle modules](#loading-a-subset-of-gradle-modules)
-      - [Extension file structure](#extension-file-structure)
-      - [build.gradle.kts](#buildgradlekts)
-    - [Source declaration](#source-declaration)
-      - [Annotate your source class](#annotate-your-source-class)
-      - [Declare sources in build.gradle.kts](#declare-sources-in-buildgradlekts)
-      - [baseUrl modes](#baseurl-modes)
-      - [Multiple sources from one class](#multiple-sources-from-one-class)
-    - [Core dependencies](#core-dependencies)
-      - [Extension API](#extension-api)
-      - [lib tools](#lib-tools)
-      - [Available libs](#available-libs)
-      - [Adding a lib dependency](#adding-a-lib-dependency)
-      - [Creating a new lib](#creating-a-new-lib)
-      - [keiyoushi.utils (core utilities)](#keiyoushiutils-core-utilities)
-        - [JSON parsing - `parseAs`](#json-parsing---parseas)
-        - [JSON serialization - `toJsonString` / `toJsonRequestBody`](#json-serialization---tojsonstring--tojsonrequestbody)
-        - [JSON models (DTOs) and serialization](#json-models-dtos-and-serialization)
-        - [Protobuf parsing and serialization - `parseAsProto` / `toRequestBodyProto`](#protobuf-parsing-and-serialization---parseasproto--torequestbodyproto)
-        - [Date parsing - `tryParse` helpers](#date-parsing---tryparse-helpers)
-        - [HTTP requests - `OkHttpClient.get` / `post` / `put` / `head`](#http-requests---okhttpclientget--post--put--head)
-        - [Custom cookies - `addCookie`](#custom-cookies---addcookie)
-        - [WebView execution - `runWebView` / `getLocalStorage`](#webview-execution---runwebview--getlocalstorage)
-        - [Filter helpers - `firstInstance` / `firstInstanceOrNull`](#filter-helpers---firstinstance--firstinstanceornull)
-        - [SharedPreferences - `getPreferences` / `getPreferencesLazy`](#sharedpreferences---getpreferences--getpreferenceslazy)
-        - [Next.js data extraction - `extractNextJs` / `extractNextJsRsc`](#nextjs-data-extraction---extractnextjs--extractnextjsrsc)
-        - [Extracting URLs - `setUrlWithoutDomain` + `absUrl`](#extracting-urls---seturlwithoutdomain--absurl)
-        - [GraphQL Requests - `graphQLPost` / `parseGraphQLAs`](#graphql-requests---graphqlpost--parsegraphqlas)
-        - [GraphQL GET requests - `graphQLGet`](#graphql-get-requests---graphqlget)
-        - [JsonElement accessor helpers](#jsonelement-accessor-helpers)
-        - [ZIP streaming - `readZipDirectory` / `readZipEntry`](#zip-streaming---readzipdirectory--readzipentry)
-      - [Additional dependencies](#additional-dependencies)
-    - [Extension main class](#extension-main-class)
-      - [KeiSource](#keisource)
-      - [Main class key variables](#main-class-key-variables)
-    - [HTML and Image Processing](#html-and-image-processing)
-    - [OkHttp and Network](#okhttp-and-network)
-    - [Extension call flow](#extension-call-flow)
-      - [Popular Manga](#popular-manga)
-      - [Latest Manga](#latest-manga)
-      - [Manga Search](#manga-search)
-        - [Filters](#filters)
-      - [Manga Details](#manga-details)
-      - [Chapter](#chapter)
-      - [Chapter Pages](#chapter-pages)
-    - [Misc notes](#misc-notes)
-    - [Advanced Extension features](#advanced-extension-features)
-      - [Extension logic and app features](#extension-logic-and-app-features)
-      - [Configurable Sources and Preferences](#configurable-sources-and-preferences)
-      - [URL intent filter](#url-intent-filter)
-      - [Update strategy](#update-strategy)
-      - [Renaming existing sources](#renaming-existing-sources)
-  - [Multi-source themes](#multi-source-themes)
-    - [Creating a new theme](#creating-a-new-theme)
-      - [Theme directory structure](#theme-directory-structure)
-      - [Theme build.gradle.kts](#theme-buildgradlekts)
-      - [Theme main class](#theme-main-class)
-    - [Using a Theme](#using-a-theme)
-  - [Running](#running)
-  - [Debugging](#debugging)
-    - [Android Debugger](#android-debugger)
-    - [Logs](#logs)
-    - [Inspecting network calls](#inspecting-network-calls)
-    - [Using external network inspecting tools](#using-external-network-inspecting-tools)
-      - [Set up your proxy server](#set-up-your-proxy-server)
-      - [OkHttp proxy setup](#okhttp-proxy-setup)
-  - [Building](#building)
-  - [Submitting the changes](#submitting-the-changes)
-    - [Pull Request checklist](#pull-request-checklist)
+    - [Table of Contents](#table-of-contents)
+    - [Prerequisites](#prerequisites)
+        - [Tools](#tools)
+        - [Cloning the repository](#cloning-the-repository)
+    - [Getting help](#getting-help)
+    - [Writing an extension](#writing-an-extension)
+        - [Setting up a new Gradle module](#setting-up-a-new-gradle-module)
+            - [Using ext-bootstrap.py](#using-ext-bootstrappy)
+        - [Loading a subset of Gradle modules](#loading-a-subset-of-gradle-modules)
+            - [Extension file structure](#extension-file-structure)
+            - [build.gradle.kts](#buildgradlekts)
+        - [Source declaration](#source-declaration)
+            - [Annotate your source class](#annotate-your-source-class)
+            - [Declare sources in build.gradle.kts](#declare-sources-in-buildgradlekts)
+            - [baseUrl modes](#baseurl-modes)
+            - [Multiple sources from one class](#multiple-sources-from-one-class)
+        - [Core dependencies](#core-dependencies)
+            - [Extension API](#extension-api)
+            - [lib tools](#lib-tools)
+            - [Available libs](#available-libs)
+            - [Adding a lib dependency](#adding-a-lib-dependency)
+            - [Creating a new lib](#creating-a-new-lib)
+            - [keiyoushi.utils (core utilities)](#keiyoushiutils-core-utilities)
+                - [JSON parsing - `parseAs`](#json-parsing---parseas)
+                - [JSON serialization - `toJsonString` / `toJsonRequestBody`](#json-serialization---tojsonstring--tojsonrequestbody)
+                - [JSON models (DTOs) and serialization](#json-models-dtos-and-serialization)
+                - [Protobuf parsing and serialization - `parseAsProto` / `toRequestBodyProto`](#protobuf-parsing-and-serialization---parseasproto--torequestbodyproto)
+                - [Date parsing - `tryParse` helpers](#date-parsing---tryparse-helpers)
+                - [HTTP requests - `OkHttpClient.get` / `post` / `put` / `head`](#http-requests---okhttpclientget--post--put--head)
+                - [Custom cookies - `addCookie`](#custom-cookies---addcookie)
+                - [WebView execution - `runWebView` / `getLocalStorage`](#webview-execution---runwebview--getlocalstorage)
+                - [Filter helpers - `firstInstance` / `firstInstanceOrNull`](#filter-helpers---firstinstance--firstinstanceornull)
+                - [SharedPreferences - `getPreferences` / `getPreferencesLazy`](#sharedpreferences---getpreferences--getpreferenceslazy)
+                - [Next.js data extraction - `extractNextJs` / `extractNextJsRsc`](#nextjs-data-extraction---extractnextjs--extractnextjsrsc)
+                - [Extracting URLs - `setUrlWithoutDomain` + `absUrl`](#extracting-urls---seturlwithoutdomain--absurl)
+                - [GraphQL Requests - `graphQLPost` / `parseGraphQLAs`](#graphql-requests---graphqlpost--parsegraphqlas)
+                - [GraphQL GET requests - `graphQLGet`](#graphql-get-requests---graphqlget)
+                - [JsonElement accessor helpers](#jsonelement-accessor-helpers)
+                - [ZIP streaming - `readZipDirectory` / `readZipEntry`](#zip-streaming---readzipdirectory--readzipentry)
+            - [Additional dependencies](#additional-dependencies)
+        - [Extension main class](#extension-main-class)
+            - [KeiSource](#keisource)
+            - [Main class key variables](#main-class-key-variables)
+        - [HTML and Image Processing](#html-and-image-processing)
+        - [OkHttp and Network](#okhttp-and-network)
+        - [Extension call flow](#extension-call-flow)
+            - [Popular Manga](#popular-manga)
+            - [Latest Manga](#latest-manga)
+            - [Manga Search](#manga-search)
+                - [Filters](#filters)
+            - [Manga Details](#manga-details)
+            - [Chapter](#chapter)
+            - [Chapter Pages](#chapter-pages)
+        - [Misc notes](#misc-notes)
+        - [Advanced Extension features](#advanced-extension-features)
+            - [Extension logic and app features](#extension-logic-and-app-features)
+            - [Configurable Sources and Preferences](#configurable-sources-and-preferences)
+            - [URL intent filter](#url-intent-filter)
+            - [Update strategy](#update-strategy)
+            - [Renaming existing sources](#renaming-existing-sources)
+    - [Multi-source themes](#multi-source-themes)
+        - [Creating a new theme](#creating-a-new-theme)
+            - [Theme directory structure](#theme-directory-structure)
+            - [Theme build.gradle.kts](#theme-buildgradlekts)
+            - [Theme main class](#theme-main-class)
+        - [Using a Theme](#using-a-theme)
+    - [Running](#running)
+    - [Debugging](#debugging)
+        - [Android Debugger](#android-debugger)
+        - [Logs](#logs)
+        - [Inspecting network calls](#inspecting-network-calls)
+        - [Using external network inspecting tools](#using-external-network-inspecting-tools)
+            - [Set up your proxy server](#set-up-your-proxy-server)
+            - [OkHttp proxy setup](#okhttp-proxy-setup)
+    - [Building](#building)
+    - [Submitting the changes](#submitting-the-changes)
+        - [Pull Request checklist](#pull-request-checklist)
 
 ## Prerequisites
 
@@ -101,10 +101,10 @@ that existing contributors will not actively teach these to you.
 - Basic [Android development](https://developer.android.com/)
 - [Kotlin](https://kotlinlang.org/)
 - Web scraping
-  - [HTML](https://developer.mozilla.org/en-US/docs/Web/HTML)
-  - [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors)
-  - [OkHttp](https://square.github.io/okhttp/)
-  - [JSoup](https://jsoup.org/)
+    - [HTML](https://developer.mozilla.org/en-US/docs/Web/HTML)
+    - [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors)
+    - [OkHttp](https://square.github.io/okhttp/)
+    - [JSoup](https://jsoup.org/)
 
 ### Tools
 
@@ -1146,12 +1146,12 @@ Behavior `KeiSource` gives you for free:
 
 - **Memory-efficient Image Interceptors:** When implementing interceptors for descrambling, stitching, or decrypting images, avoid loading the entire image into a `ByteArray`, as this can cause `OutOfMemoryError` on low-end devices. Prefer stream-based processing:
 
-  - **Read:** Use `response.body.byteStream()` with `BitmapFactory.decodeStream()` to decode images directly from the stream.
-  - **Write:** Write the processed bitmap into an Okio `Buffer` via `output.outputStream()` and convert it using `asResponseBody(mediaType)`.
-  - **Decryption:** Use Okio's `cipherSource` extension for stream-based decryption rather than decrypting a full byte array in memory.
-  - Note: `readByteArray()` should generally be avoided here because it forces full in-memory buffering of the image. Streaming directly keeps memory usage lower and more stable.
-  - Always wrap network responses in `response.use { ... }` to ensure the response body is properly closed and memory leaks are prevented.
-  - If applicable, call `bitmap.recycle()` after use to free native memory early.
+    - **Read:** Use `response.body.byteStream()` with `BitmapFactory.decodeStream()` to decode images directly from the stream.
+    - **Write:** Write the processed bitmap into an Okio `Buffer` via `output.outputStream()` and convert it using `asResponseBody(mediaType)`.
+    - **Decryption:** Use Okio's `cipherSource` extension for stream-based decryption rather than decrypting a full byte array in memory.
+    - Note: `readByteArray()` should generally be avoided here because it forces full in-memory buffering of the image. Streaming directly keeps memory usage lower and more stable.
+    - Always wrap network responses in `response.use { ... }` to ensure the response body is properly closed and memory leaks are prevented.
+    - If applicable, call `bitmap.recycle()` after use to free native memory early.
 
 - **Do not manually check for Cloudflare:** Do not manually check for Cloudflare challenges (e.g., checking for "Just a moment..." text) in `parse` methods. The app handles this before calling the parser.
 - **Prefer stable selectors:** Avoid relying on volatile auto-generated CSS class names (e.g., `styles_Card__jN8og`) or complex regex for parsing. Prefer stable structural selectors.
@@ -1198,7 +1198,7 @@ a.k.a. the Browse source entry point in the app (invoked by tapping on the sourc
 
 - The app calls `getPopularManga` which should return a `MangasPage` containing the first batch of
   found `SManga` entries.
-  - This method supports pagination. When user scrolls the manga list and more results must be fetched,
+    - This method supports pagination. When user scrolls the manga list and more results must be fetched,
       the app calls it again with increasing `page` values (starting with `page=1`). This continues while
       `MangasPage.hasNextPage` is passed as `true` and `MangasPage.mangas` is not empty.
 - To show the list properly, the app needs `url`, `title` and `thumbnail_url`. You **must** set them
@@ -1218,8 +1218,8 @@ the source name).
 
 - When the user searches inside the app, `getSearchMangaList` will be called and the rest of the
   flow is similar to what happens with `getPopularManga`.
-  - If search functionality is not available, return `MangasPage(emptyList(), false)`.
-  - If the query itself is a URL, `getMangaByUrl` is called instead - see [KeiSource](#keisource).
+    - If search functionality is not available, return `MangasPage(emptyList(), false)`.
+    - If the query itself is a URL, `getMangaByUrl` is called instead - see [KeiSource](#keisource).
 - `getFilterList` will be called to get all filters and filter types.
 
 ##### Filters
@@ -1258,19 +1258,19 @@ open class UriPartFilter(displayName: String, private val vals: Array<Pair<Strin
 
 - When a user taps on a manga, `fetchMangaUpdate` is called (with `fetchDetails`/`fetchChapters` set
   according to what's needed) and the results are cached.
-  - A `SManga` entry is identified by its `url`.
+    - A `SManga` entry is identified by its `url`.
 - `fetchDetails = true` asks for updated manga details.
-  - `SManga.initialized` tells the app whether details need fetching. You do not need to set it
+    - `SManga.initialized` tells the app whether details need fetching. You do not need to set it
       yourself: `getMangaUpdate` (the `final` wrapper around `fetchMangaUpdate`) always sets it to
       `true` on the returned manga.
-  - `SManga.genre` is a string containing a list of all genres separated by `", "`.
-  - `SManga.status` is an "enum" value. Refer to [the values in the `SManga` companion object](https://github.com/tachiyomiorg/extensions-lib/blob/8240b5cfecbd281bc737ac159ea7d4e5825ed3df/library/src/main/java/eu/kanade/tachiyomi/source/model/SManga.kt#L26).
-  - During a backup, only `url` and `title` are stored. To restore the rest of the manga data, the
+    - `SManga.genre` is a string containing a list of all genres separated by `", "`.
+    - `SManga.status` is an "enum" value. Refer to [the values in the `SManga` companion object](https://github.com/tachiyomiorg/extensions-lib/blob/8240b5cfecbd281bc737ac159ea7d4e5825ed3df/library/src/main/java/eu/kanade/tachiyomi/source/model/SManga.kt#L26).
+    - During a backup, only `url` and `title` are stored. To restore the rest of the manga data, the
       app calls `fetchMangaUpdate` with `fetchDetails = true`, so all fields should be (re)filled if possible.
-  - If a `SManga` is cached, details are only re-fetched when the user performs a manual update
+    - If a `SManga` is cached, details are only re-fetched when the user performs a manual update
       (Swipe-to-Refresh).
 - `fetchChapters = true` asks for the chapter list.
-  - **The list should be sorted descending by the source order**.
+    - **The list should be sorted descending by the source order**.
 - `getMangaUrl` is called when the user taps "Open in WebView". It defaults to `baseUrl + manga.url`;
   only override it if that doesn't already resolve to the manga's page on the website. In practice
   this is common, since `SManga.url` is recommended to hold just an ID/slug rather than a full
@@ -1280,41 +1280,41 @@ open class UriPartFilter(displayName: String, private val vals: Array<Pair<Strin
 
 - `SChapter.date_upload` is the [UNIX Epoch time](https://en.wikipedia.org/wiki/Unix_time)
   **expressed in milliseconds**.
-  - If you do not pass `SChapter.date_upload` and leave it at zero, the app will use the default date
+    - If you do not pass `SChapter.date_upload` and leave it at zero, the app will use the default date
       instead, but it is recommended to fill it if available.
-  - For ISO-8601 date strings, prefer `kotlin.time.Instant.parseOrNull`:
+    - For ISO-8601 date strings, prefer `kotlin.time.Instant.parseOrNull`:
 
-        ```kotlin
-        import kotlin.time.Instant
-  
-        chapter.date_upload = Instant.parseOrNull(dateStr)?.toEpochMilliseconds() ?: 0L
-        ```
+          ```kotlin
+          import kotlin.time.Instant
+
+          chapter.date_upload = Instant.parseOrNull(dateStr)?.toEpochMilliseconds() ?: 0L
+          ```
 
       For any other format, prefer `java.time` (`DateTimeFormatter` + `LocalDateTime`) over
       `SimpleDateFormat`, which is discouraged for new code:
 
-        ```kotlin
-        import java.time.LocalDateTime
-        import java.time.ZoneOffset
-        import java.time.format.DateTimeFormatter
-  
-        chapter.date_upload = runCatching {
-            LocalDateTime.parse(dateStr, dateFormat).toInstant(ZoneOffset.UTC).toEpochMilli()
-        }.getOrDefault(0L)
-  
-        private val dateFormat by lazy {
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
-        }
-        ```
+          ```kotlin
+          import java.time.LocalDateTime
+          import java.time.ZoneOffset
+          import java.time.format.DateTimeFormatter
+
+          chapter.date_upload = runCatching {
+              LocalDateTime.parse(dateStr, dateFormat).toInstant(ZoneOffset.UTC).toEpochMilli()
+          }.getOrDefault(0L)
+
+          private val dateFormat by lazy {
+              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
+          }
+          ```
 
       Ensure the formatter is a class constant or variable so it is not recreated for every chapter
       (a `DateTimeFormatter`, unlike `SimpleDateFormat`, is thread-safe and can safely be reused across
       instances).
 
-  - If parsing fails, return `0L` so the app uses the default date
+    - If parsing fails, return `0L` so the app uses the default date
       instead.
-  - The app will overwrite the dates of existing chapters **UNLESS** `0L` is returned.
-  - If the source only provides the manga's update date, assign it to the latest chapter only.
+    - The app will overwrite the dates of existing chapters **UNLESS** `0L` is returned.
+    - If the source only provides the manga's update date, assign it to the latest chapter only.
 
 - `getChapterUrl` is called when the user taps "Open in WebView" in the reader. Like `getMangaUrl`,
   it defaults to `baseUrl + chapter.url`; override it only when that doesn't resolve to the chapter's
@@ -1337,7 +1337,7 @@ open class UriPartFilter(displayName: String, private val vals: Array<Pair<Strin
 
 ### Misc notes
 
-- **Use `asJsoup()`:** Instead of manually reading the response body and parsing it with Jsoup (`Jsoup.parse(response.body.string())`), use the app's built-in extension function: `response.asJsoup()` (requires `import eu.kanade.tachiyomi.util.asJsoup`).
+- **Use `asJsoup()`:** Instead of manually reading the response body and parsing it with Jsoup (`Jsoup.parse(response.body.string())`), use the built-in extension function: `response.asJsoup()` (`import keiyoushi.utils.asJsoup`), which streams the body and closes the response when done.
 - **Jsoup `.text()` is already trimmed:** Calling `element.text().trim()` is redundant because Jsoup automatically normalizes and trims whitespace. Just use `element.text()`.
 - **Omit default `joinToString` separator:** The default separator for `joinToString` is already `", "`. Do not pass it explicitly. Use `joinToString { it.text() }` instead of `joinToString(", ") { it.text() }`, and `joinToString()` instead of `joinToString(", ")`.
 - **Use named parameters for `Page`:** When instantiating `Page` objects, use the named parameter for the image URL: `Page(index, imageUrl = url)` instead of passing an empty string as the second argument (`Page(index, "", url)`).
