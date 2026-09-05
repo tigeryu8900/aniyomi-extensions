@@ -6,77 +6,77 @@
     },
     "jar": {
       "name": "tachiyomi-all.mangadex-v1.4.212.jar",
-      "sha256": "601de05c820c71b4fbaeea3cc469c82e06bf0c5d4879966a429aec036c3f145a"
+      "sha256": "8cf9930deae49cb85f847bdb26d5e1feb9ad1050b7417a7d33969e4016a45f32"
     }
   },
   "eu.kanade.tachiyomi.extension.all.mangafire": {
     "apk": {
-      "name": "tachiyomi-all.mangafire-v1.6.32.apk",
-      "sha256": "06d1eeeaddc6abf4da07bfdee122167358fbf3ac25ec267303ee2aa50115cc4e"
+      "name": "tachiyomi-all.mangafire-v1.6.34.apk",
+      "sha256": "15c8921d9c84b3c5385db32cd5b973a7685f60b7cae7cd43639c8e1d4c9b05a7"
     },
     "jar": {
-      "name": "tachiyomi-all.mangafire-v1.6.32.jar",
-      "sha256": "7045b40e13711f939fd8d3fa8ddb1e450f7274255db3ad6f0c881a2764c319b5"
+      "name": "tachiyomi-all.mangafire-v1.6.34.jar",
+      "sha256": "c4fd213168f266ff1bb2e11d2cc7b23c55fbd2897b0ad7501393ccfeb2b5da91"
     }
   },
   "eu.kanade.tachiyomi.extension.en.artlapsa": {
     "apk": {
       "name": "tachiyomi-en.artlapsa-v1.6.26.apk",
-      "sha256": "0689e62f13991368bc8bfb372fe65aaf1c31172ac2f8c1824cd38236b03fcadc"
+      "sha256": "e4fb450a7302625c472ebe3591ec784d7d7409b0d50f8783dd4a94f5e4bbf212"
     },
     "jar": {
       "name": "tachiyomi-en.artlapsa-v1.6.26.jar",
-      "sha256": "20ba7c11b245d284038f5e888fb2de7c64603e1b2d35c3b8b57b30f63d7b70a5"
+      "sha256": "f7da1b5722ed7d2950844350cf7feb54c852f85d469c38979b78f27ade18dcae"
     }
   },
   "eu.kanade.tachiyomi.extension.en.asmotoon": {
     "apk": {
       "name": "tachiyomi-en.asmotoon-v1.6.24.apk",
-      "sha256": "2189088d8457ba89edb493594338f17fcbc4d72e13b09683188ccd1f967bb691"
+      "sha256": "3955997dbb3bfa8295115ac206d4fba724ad9cb02d8dc305435884062e7d7d65"
     },
     "jar": {
       "name": "tachiyomi-en.asmotoon-v1.6.24.jar",
-      "sha256": "8e6662c89cabd000d210035dc20aa6db9fc7e1dbfefcfc6f7031b72e16df83fb"
+      "sha256": "c18e51450a8ea1f50c074cf92585435c600d838c65e118404eda9dae8dbf7b21"
     }
   },
   "eu.kanade.tachiyomi.extension.en.mangabat": {
     "apk": {
       "name": "tachiyomi-en.mangabat-v1.6.23.apk",
-      "sha256": "162c0744058ad3f66a45c4425ba4dbec0bb61e9dbc86aca201bac73bbbdf085f"
+      "sha256": "c9925e918f0de9a8e7632348a8ba9afb8e8521cbf0e5c5def7a2f526b9f2e0cf"
     },
     "jar": {
       "name": "tachiyomi-en.mangabat-v1.6.23.jar",
-      "sha256": "18bb340e8639756f26f1992a7b0d0d6944904d3b32cc5e5feeffabed936b1cd5"
+      "sha256": "0d8fa39d2112a351a384c2f2f6dd9d5d2cad076722d8c920dd5a180979daf467"
     }
   },
   "eu.kanade.tachiyomi.extension.en.mangakakalot": {
     "apk": {
       "name": "tachiyomi-en.mangakakalot-v1.6.24.apk",
-      "sha256": "edaad45808b6e627bdb95d4f221d3b8077f5a3c3da50ffbf870932b1111861c6"
+      "sha256": "016e917f8dde932acad093372da88cf87ed3605588530e119f9fa679c9ba0eb7"
     },
     "jar": {
       "name": "tachiyomi-en.mangakakalot-v1.6.24.jar",
-      "sha256": "b3fe4978f87f51c9c8549d94a95893a6c94077a0fe243606da41906b50652174"
+      "sha256": "8b6cb985b20b30a6f611aaa8019a97c644a4462ab1d4c737807a337413b69943"
     }
   },
   "eu.kanade.tachiyomi.extension.en.manganelo": {
     "apk": {
       "name": "tachiyomi-en.manganelo-v1.6.22.apk",
-      "sha256": "31261e02ab8bafd64b67ae095a185016d8d13bf9c13ad0308530f9f50c86ab7e"
+      "sha256": "ff6ddbbe2a8fa919beef8b32f3cd8fe516e858b10b60777e5878ee01e33d64e3"
     },
     "jar": {
       "name": "tachiyomi-en.manganelo-v1.6.22.jar",
-      "sha256": "68493012673c3004b2b79e05d3f832871c96bbc939b6e7d58e83b4213660ed0c"
+      "sha256": "d35790ab5b5bb0cb9115fa4d88b47dec43add2a5e2895a4b48ebc7e6acc98689"
     }
   },
   "eu.kanade.tachiyomi.extension.en.ritharscans": {
     "apk": {
       "name": "tachiyomi-en.ritharscans-v1.6.24.apk",
-      "sha256": "5a4c6ec1dc1a60561236252d6ee108dfcbc035364004e3f53c34be8585fc2ec6"
+      "sha256": "7409bf9385222c4b5ac02874fd8fc9bba8e96bb8160887ebd8b714099b98bdd4"
     },
     "jar": {
       "name": "tachiyomi-en.ritharscans-v1.6.24.jar",
-      "sha256": "ffcb6448eaca90ffb67c733ebb51ff45efd1660a846f62108dd7e4099b8ab638"
+      "sha256": "5aff253e220d40b6d6366aaf859fac3df5da960a3729cec94e179713c297448e"
     }
   }
 }
