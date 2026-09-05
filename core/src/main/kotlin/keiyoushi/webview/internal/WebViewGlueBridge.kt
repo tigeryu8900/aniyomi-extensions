@@ -11,6 +11,9 @@ import org.chromium.support_lib_boundary.WebkitToCompatConverterBoundaryInterfac
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
+// TACH -->
+@SuppressLint("RestrictedApi")
+// <-- TACH
 internal object WebViewGlueBridge {
 
     private lateinit var factory: WebViewProviderFactoryBoundaryInterface
