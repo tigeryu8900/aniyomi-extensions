@@ -2,11 +2,9 @@
 
 package org.chromium.support_lib_boundary
 
-/* TACH -->
 import java.lang.reflect.InvocationHandler
 
 internal interface WebViewProviderFactoryBoundaryInterface {
     val webkitToCompatConverter: InvocationHandler
     val supportedFeatures: Array<String>
 }
-<-- TACH */
