@@ -24,9 +24,7 @@ android {
 
 dependencies {
     // TACH -->
-    implementation(libs.webkit) {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
+    compileOnly(libs.webkit)
     compileOnly(project(":stub"))
     // <-- TACH
 
