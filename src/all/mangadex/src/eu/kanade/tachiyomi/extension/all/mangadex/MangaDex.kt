@@ -144,11 +144,15 @@ class MangaDex(
 
     override suspend fun getLatestUpdates(page: Int): MangasPage = latestUpdatesParse(client.get(latestUpdatesUrl(page), CacheControl.FORCE_NETWORK))
 
-    @Suppress("unused")
+    /**
+     * Used by Komikku
+     */
     fun latestUpdatesRequest(page: Int): Request = GET(latestUpdatesUrl(page), headers, CacheControl.FORCE_NETWORK)
 
     /**
      * The API endpoint can't sort by date yet, so not implemented.
+     *
+     * Used by Komikku
      */
     fun latestUpdatesParse(response: Response): MangasPage {
         val chapterListDto = response.parseAs<ChapterListDto>()
